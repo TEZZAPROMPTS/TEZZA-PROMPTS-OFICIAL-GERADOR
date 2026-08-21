@@ -57,3 +57,8 @@
 - [x] Validar o fluxo completo de rosto e cena para os métodos Feminino e Masculino sem perda de características.
 - [x] Mapear deterministicamente traços de cabelo para HAIR e traços corporais para BODY & PHYSIQUE no prompt final.
 - [x] Validar no navegador o fluxo completo do Método Masculino com rosto, cena e preservação dos traços extraídos.
+- [x] Identificar a mutação de rosto ou cena que ainda ultrapassa o limite do gateway e retorna HTML.
+- [x] Reduzir o tamanho máximo dos payloads e impedir o envio antes da mutação quando ultrapassarem o limite seguro.
+- [x] Validar por HTTP que extração de rosto e geração por cena retornam JSON para payloads válidos e erros JSON para payloads grandes.
+- [x] Confirmar por HTTP direto as respostas JSON de sucesso de extração de rosto e geração por cena após a redução dos limites.
+- [x] Confirmar por HTTP direto que payloads de rosto e cena acima do novo limite retornam erro JSON estruturado, sem HTML do gateway.

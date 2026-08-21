@@ -55,7 +55,7 @@ describe("prompt.generate", () => {
 
   it("rejects an oversized image payload before it reaches the generation service", async () => {
     const caller = appRouter.createCaller(createContext());
-    const oversizedImage = `data:image/jpeg;base64,${"a".repeat(950_000)}`;
+    const oversizedImage = `data:image/jpeg;base64,${"a".repeat(300_000)}`;
 
     await expect(caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageDataUrl: oversizedImage })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(invokeLLMMock).not.toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe("prompt.generate", () => {
 
   it("returns a specific validation message when a scene image is too large", async () => {
     const caller = appRouter.createCaller(createContext());
-    const oversizedImage = `data:image/jpeg;base64,${"a".repeat(950_000)}`;
+    const oversizedImage = `data:image/jpeg;base64,${"a".repeat(300_000)}`;
 
     await expect(caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageDataUrl: oversizedImage })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });

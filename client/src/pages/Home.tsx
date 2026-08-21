@@ -12,7 +12,7 @@ type PromptHistoryEntry = { id: string; createdAt: number; mode: Mode; method: P
 
 const SESSION_HISTORY_KEY = "tezza-prompts-session-history";
 const MAX_UPLOAD_FILE_SIZE = 8 * 1024 * 1024;
-const MAX_MUTATION_IMAGE_LENGTH = 900_000;
+const MAX_MUTATION_IMAGE_LENGTH = 260_000;
 const METHOD_COPY: Record<PromptMethod, { label: string; subtitle: string; input: string }> = {
   feminine: { label: "Método Feminino", subtitle: "Avatar CGI feminino", input: "Uma avatar adulta em um rooftop de São Paulo à noite, cabelo cacheado solto, vestido preto minimalista e flash de smartphone..." },
   masculine: { label: "Método Masculino", subtitle: "Avatar CGI masculino", input: "Um avatar adulto em uma varanda urbana noturna, cabelo curto preto, visual editorial e luz de flash cinematográfica..." },
@@ -33,8 +33,8 @@ async function compressImageForGeneration(file: File): Promise<string> {
     });
 
     const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
-    const targetSizes = [1600, 1280, 1024, 880, 720];
-    const qualities = [0.82, 0.72, 0.63, 0.55, 0.48];
+    const targetSizes = [1280, 1080, 900, 760, 640, 540];
+    const qualities = [0.70, 0.62, 0.54, 0.46, 0.40, 0.34];
 
     for (let index = 0; index < targetSizes.length; index += 1) {
       const scale = Math.min(1, targetSizes[index] / longestSide);

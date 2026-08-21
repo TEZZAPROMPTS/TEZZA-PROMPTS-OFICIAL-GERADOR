@@ -36,7 +36,7 @@ export const appRouter = router({
       .input(
         z.object({
           method: z.enum(["feminine", "masculine"]),
-          faceReferenceDataUrl: z.string().max(950_000, "A imagem do rosto ainda está grande demais. Escolha uma imagem menor.").refine(value => value.startsWith("data:image/"), "Escolha uma imagem de rosto válida."),
+          faceReferenceDataUrl: z.string().max(300_000, "A imagem do rosto ainda está grande demais. Escolha uma imagem menor.").refine(value => value.startsWith("data:image/"), "Escolha uma imagem de rosto válida."),
         })
       )
       .mutation(async ({ input }) => {
@@ -56,7 +56,7 @@ export const appRouter = router({
             mode: z.enum(["text", "photo"]),
             userText: z.string().trim().min(8).max(2400).optional(),
             personalTraits: z.string().trim().max(1800).optional(),
-            sceneImageDataUrl: z.string().max(950_000, "A imagem da cena ainda está grande demais. Escolha uma imagem menor.").optional(),
+            sceneImageDataUrl: z.string().max(300_000, "A imagem da cena ainda está grande demais. Escolha uma imagem menor.").optional(),
           })
           .superRefine((value, ctx) => {
             if (value.mode === "text" && !value.userText) ctx.addIssue({ code: "custom", message: "Descreva um pouco mais a direção desejada para o prompt." });
