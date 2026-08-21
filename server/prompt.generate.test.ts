@@ -27,7 +27,7 @@ describe("prompt.generate", () => {
     storageGetSignedUrlMock.mockImplementation(async (key: string) => `https://signed-storage.example/${key}`);
   });
 
-  it("generates the independent Masculine prompt and passes traits to the model", async () => {
+  it("passes personal traits to the model without injecting technical preservation text into the prompt", async () => {
     mockStructuredGeneration();
     const caller = appRouter.createCaller(createContext());
     const result = await caller.prompt.generate({
@@ -40,9 +40,8 @@ describe("prompt.generate", () => {
     expect(result.method).toBe("masculine");
     expect(result.prompt.startsWith(METHOD_SPECS.masculine.opening)).toBe(true);
     expect(JSON.stringify(invokeLLMMock.mock.calls[0]?.[0])).toContain("short black curly hair");
-    expect(result.prompt).toContain("Mandatory identity traits to preserve: Keep short black curly hair and a lean athletic build.");
-    expect(result.prompt).toContain("Mandatory hair traits to preserve: Keep short black curly hair and a lean athletic build.");
-    expect(result.prompt).toContain("Mandatory body and proportion traits to preserve: Keep short black curly hair and a lean athletic build.");
+    expect(result.prompt).not.toContain("traits to preserve:");
+    expect(result.prompt).not.toContain("Mandatory");
   });
 
   it("sends a selected image as multimodal content for the Feminine method", async () => {
@@ -114,11 +113,9 @@ describe("prompt.generate", () => {
       expect(generated.prompt).toContain(METHOD_SPECS[method].closing);
       if (method === "feminine") {
         expect(generated.prompt).toContain(`FACE & IDENTITY\n${METHOD_SPECS.feminine.faceIdentityBase}`);
-        expect(generated.prompt).not.toContain("Mandatory identity traits to preserve:");
-      } else {
-        expect(generated.prompt).toContain(`Mandatory identity traits to preserve: ${traits}`);
+        expect(generated.prompt).toContain(`HAIR\n${METHOD_SPECS.feminine.hairBase}`);
       }
-      expect(generated.prompt).toContain(`Mandatory hair traits to preserve: ${traits}`);
+      expect(generated.prompt).not.toContain("traits to preserve:");
     }
 
     const [femaleFace, femaleScene, maleFace, maleScene] = invokeLLMMock.mock.calls.map(call => call[0]);

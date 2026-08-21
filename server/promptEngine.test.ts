@@ -73,7 +73,7 @@ describe("Tezza prompt methods", () => {
     expect(normalized.hair).not.toMatch(/reference|image|tattoo|→/i);
   });
 
-  it("keeps the authorized Feminine FACE & IDENTITY block literal when personal traits are supplied", () => {
+  it("keeps the authorized Feminine FACE & IDENTITY and HAIR blocks literal without technical trait prefixes", () => {
     const personalTraits = "Face & Identity: Oval face with freckles and blue-grey eyes.\nHair: Long platinum blonde hair.\nBody & Physique: Slender shoulders.";
     const feminine = renderMethodPrompt("feminine", {
       ...completeSections,
@@ -82,12 +82,17 @@ describe("Tezza prompt methods", () => {
     const masculine = renderMethodPrompt("masculine", completeSections, personalTraits);
 
     expect(feminine).toContain(`FACE & IDENTITY\n${METHOD_SPECS.feminine.faceIdentityBase}`);
-    expect(feminine).not.toContain("Mandatory identity traits to preserve:");
+    expect(feminine).toContain(`HAIR\n${METHOD_SPECS.feminine.hairBase}`);
+    expect(feminine).not.toContain("traits to preserve:");
     expect(feminine).not.toContain("Oval face with freckles and blue-grey eyes.");
+    expect(feminine).not.toContain("Long platinum blonde hair.");
     expect(feminine).not.toContain("This generated facial description must not replace the authorized base.");
-    expect(feminine).toContain("Mandatory hair traits to preserve: Long platinum blonde hair.");
-    expect(feminine).toContain("Mandatory body and proportion traits to preserve: Slender shoulders.");
-    expect(masculine).toContain("Mandatory identity traits to preserve: Oval face with freckles and blue-grey eyes.");
+    expect(feminine).not.toContain("Mandatory body and proportion traits to preserve:");
+    expect(feminine).toContain("BODY & PHYSIQUE\nSlender shoulders. Precise English description for bodyPhysique.");
+    expect(masculine).not.toContain("traits to preserve:");
+    expect(masculine).toContain("FACE & IDENTITY\nOval face with freckles and blue-grey eyes. Precise English description for faceIdentity.");
+    expect(masculine).toContain("HAIR\nLong platinum blonde hair. Precise English description for hair.");
+    expect(masculine).toContain("BODY & PHYSIQUE\nSlender shoulders. Precise English description for bodyPhysique.");
   });
 
   it("keeps each supplied base distinct while enforcing the fixed fourteen-section contract", () => {
@@ -95,7 +100,8 @@ describe("Tezza prompt methods", () => {
     const masculineSystem = String(buildGenerationMessages({ method: "masculine", mode: "text", userText: "A refined city portrait." })[0].content);
 
     expect(feminineSystem).toContain("Female Method 1 Gemini structure");
-    expect(feminineSystem).toContain("never default to the example woman's blonde hair");
+    expect(feminineSystem).toContain("FACE & IDENTITY and HAIR are fixed authorized base sections");
+    expect(feminineSystem).toContain("never default to the example woman's Brazil jersey");
     expect(masculineSystem).toContain("Male Method 1 Gemini structure");
     expect(masculineSystem).toContain("never default to the example man's black curls");
     expect(feminineSystem).toContain("Populate exactly these sections");

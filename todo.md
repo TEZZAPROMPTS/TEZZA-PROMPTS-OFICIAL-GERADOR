@@ -108,6 +108,13 @@
 - [x] Validar em desktop e celular a exibição legível da nova marca, sem alterar os fluxos do gerador.
 - [x] Restaurar FACE & IDENTITY ao texto-base fixo do método, sem acrescentar traços extraídos nessa seção.
 - [x] Cobrir por teste a fidelidade literal de FACE & IDENTITY e validar os dois métodos após a correção.
+- [x] Restaurar HAIR ao texto-base natural autorizado, sem o prefixo técnico de preservação de traços.
+- [x] Cobrir por teste a fidelidade literal de HAIR e validar a ausência de repetição dos traços.
+- [x] Remover de todos os blocos os prefixos técnicos de preservação de traços e as repetições acrescentadas pelo renderizador.
+- [x] Validar em ambos os métodos que o prompt final não contém textos técnicos de preservação de traços.
+- [x] Reintroduzir a preservação determinística dos traços nas seções permitidas, usando prosa natural sem prefixos técnicos.
+- [x] Definir por método quais blocos permanecem imutáveis e onde os traços editáveis podem aparecer sem alterar a base autorizada.
+- [x] Adicionar testes que comprovem simultaneamente a ausência de textos técnicos e a preservação natural dos traços permitidos.
 
 ## Solicitação cancelada pela usuária
 
