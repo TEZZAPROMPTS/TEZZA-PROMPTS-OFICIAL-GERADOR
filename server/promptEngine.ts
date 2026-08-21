@@ -28,8 +28,6 @@ type MethodSpec = {
   opening: string;
   closing: string;
   baseDirection: string;
-  faceIdentityBase?: string;
-  hairBase?: string;
 };
 
 export const METHOD_SPECS: Record<PromptMethod, MethodSpec> = {
@@ -41,11 +39,7 @@ export const METHOD_SPECS: Record<PromptMethod, MethodSpec> = {
     closing:
       "Ultra-photorealistic Blender Cycles CGI render, cinematic realism, Seedream 5.0 beauty rendering, 8K UHD quality, physically accurate lighting and materials, realistic skin micro-detail, IMVU-inspired beauty repaint style, high-fidelity feminine avatar rendering, realistic depth of field, glossy beauty aesthetic, polished virtual influencer atmosphere, advanced ray tracing, realistic reflections, luxury editorial lighting, ultra-clean cinematic render quality, and clearly fictional CGI avatar aesthetics instead of a real photograph.",
     baseDirection:
-      "This is the Female Method 1 Gemini structure. Keep an adult female fictional CGI avatar with polished virtual-influencer beauty, feminine anatomy, luxury editorial composition, Blender Cycles material realism, Seedream 5.0 beauty rendering, IMVU/The Sims virtual-avatar aesthetics, cinematic depth, and physically plausible lighting. FACE & IDENTITY and HAIR are fixed authorized base sections. The user direction or visible photo determines the remaining individual attributes such as pose, clothing, accessories, body proportions, setting, and lighting; never default to the example woman's Brazil jersey, apartment, piercing, or any other sample-only detail unless the user direction or visible photo supports it.",
-    faceIdentityBase:
-      "Adult female CGI avatar with delicate feminine facial structure, soft jawline, symmetrical facial proportions, smooth pale skin tone, large almond-shaped eyes, glossy lips, slim nose bridge, and softly sculpted cheekbones. Skin rendering contains realistic texture, subtle pores, luminous highlights, and refined beauty realism while maintaining a stylized CGI avatar appearance instead of photoreal human rendering.",
-    hairBase:
-      "Long blonde wavy hair flowing naturally over the shoulders and chest. Hair features soft volume, realistic strand detail, silky reflections, and slightly messy face-framing bangs. Smooth salon-quality texture with cinematic shine and advanced Blender-style hair simulation.",
+      "This is the Female Method 1 Gemini structure. Keep an adult female fictional CGI avatar with polished virtual-influencer beauty, feminine anatomy, luxury editorial composition, Blender Cycles material realism, Seedream 5.0 beauty rendering, IMVU/The Sims virtual-avatar aesthetics, cinematic depth, and physically plausible lighting. The face reference determines facial identity, visible skin attributes, and hair colour, type, texture, fall, and movement. The user direction or scene photo determines pose, clothing, accessories, body proportions, setting, and lighting; never default to the example woman's Brazil jersey, apartment, piercing, or any other sample-only detail unless the user direction or visible photo supports it.",
   },
   masculine: {
     label: "Método Masculino",
@@ -107,7 +101,7 @@ function parseStructuredJson(content: string): unknown {
   return JSON.parse(json);
 }
 
-type TraitBlocks = { faceIdentity: string; hair: string; bodyPhysique: string };
+type TraitBlocks = { faceIdentity: string; hair: string; skinRealism: string; bodyPhysique: string };
 
 function valueAfterLabel(source: string, label: string, followingLabels: string[]) {
   const start = source.search(new RegExp(`(?:^|\\n)${label}\\s*:`, "i"));
@@ -120,7 +114,7 @@ function valueAfterLabel(source: string, label: string, followingLabels: string[
 
 function buildTraitBlocks(personalTraits?: string): TraitBlocks {
   const source = personalTraits?.trim() ?? "";
-  if (!source) return { faceIdentity: "", hair: "", bodyPhysique: "" };
+  if (!source) return { faceIdentity: "", hair: "", skinRealism: "", bodyPhysique: "" };
 
   const fromLabel = (label: string, followingLabels: string[]) => {
     const value = cleanSection(valueAfterLabel(source, label, followingLabels));
@@ -128,9 +122,10 @@ function buildTraitBlocks(personalTraits?: string): TraitBlocks {
   };
 
   return {
-    faceIdentity: fromLabel("Face(?: & identity)?", ["Hair", "Body(?: & proportions| & physique)?"]),
-    hair: fromLabel("Hair", ["Face(?: & identity)?", "Body(?: & proportions| & physique)?"]),
-    bodyPhysique: fromLabel("Body(?: & proportions| & physique)?", ["Face(?: & identity)?", "Hair"]),
+    faceIdentity: fromLabel("Face(?: & identity)?", ["Hair", "Skin(?: & realism)?", "Body(?: & proportions| & physique)?"]),
+    hair: fromLabel("Hair", ["Face(?: & identity)?", "Skin(?: & realism)?", "Body(?: & proportions| & physique)?"]),
+    skinRealism: fromLabel("Skin(?: & realism)?", ["Face(?: & identity)?", "Hair", "Body(?: & proportions| & physique)?"]),
+    bodyPhysique: fromLabel("Body(?: & proportions| & physique)?", ["Face(?: & identity)?", "Hair", "Skin(?: & realism)?"]),
   };
 }
 
@@ -145,17 +140,13 @@ function mergeNaturalTrait(section: string, trait: string) {
 
 function applyNaturalTraitBlocks(method: PromptMethod, sections: PromptSections, personalTraits?: string) {
   const blocks = buildTraitBlocks(personalTraits);
-  const applyBody = mergeNaturalTrait(sections.bodyPhysique, blocks.bodyPhysique);
-
-  if (method === "feminine") {
-    return { ...sections, bodyPhysique: applyBody };
-  }
-
+  void method;
   return {
     ...sections,
     faceIdentity: mergeNaturalTrait(sections.faceIdentity, blocks.faceIdentity),
     hair: mergeNaturalTrait(sections.hair, blocks.hair),
-    bodyPhysique: applyBody,
+    skinRealism: mergeNaturalTrait(sections.skinRealism, blocks.skinRealism),
+    bodyPhysique: mergeNaturalTrait(sections.bodyPhysique, blocks.bodyPhysique),
   };
 }
 
@@ -163,8 +154,6 @@ export function renderMethodPrompt(method: PromptMethod, sections: PromptSection
   const spec = METHOD_SPECS[method];
   const preparedSections = {
     ...sections,
-    faceIdentity: spec.faceIdentityBase ?? sections.faceIdentity,
-    hair: spec.hairBase ?? sections.hair,
     styleRenderQuality: spec.closing,
   };
   const naturalSections = applyNaturalTraitBlocks(method, preparedSections, personalTraits);
@@ -187,7 +176,7 @@ export function buildGenerationMessages(input: {
   const spec = METHOD_SPECS[method];
   const traits = input.personalTraits?.trim();
   const priorityTraits = traits
-    ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nThese are the highest-priority rules. Translate them into natural English prompt prose and apply them faithfully in the relevant sections. They override generic base styling whenever there is a conflict. ${method === "feminine" ? "FACE & IDENTITY and HAIR are immutable authorized base sections for this method and must not be modified with extracted traits. Apply the remaining applicable traits naturally in their relevant sections." : "Apply the traits naturally in their relevant sections."} Never use technical labels, preservation statements, duplicated phrasing, or the original Portuguese wording in the final prompt.`
+    ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nThese are the highest-priority rules. Translate them into natural English prompt prose and apply them faithfully in the relevant sections. Place facial structure and eye details only in FACE & IDENTITY; place visible skin tone and skin texture only in SKIN & REALISM; place hair colour, type, texture, fall, and movement only in HAIR; and place body details only in BODY & PHYSIQUE. Never use technical labels, preservation statements, duplicated phrasing, or the original Portuguese wording in the final prompt.`
     : "No additional personal traits were supplied.";
 
   const system = `You are the content engine for TEZZA PROMPTS. Produce only a strict JSON object matching the supplied schema. Write every value in polished English prose. The final renderer—not you—will add the method's immutable opening, immutable STYLE & RENDER QUALITY text, and the 14 immutable section headings.
@@ -271,7 +260,7 @@ export function buildFaceTraitMessages(input: { method: PromptMethod; faceRefere
   return [
     {
       role: "system" as const,
-      content: `You extract only visible, non-sensitive appearance traits from a face reference for ${role}. Return only a strict JSON object with the English string fields "faceIdentity", "hair", and "bodyPhysique". Describe visible facial structure, apparent skin tone, eye appearance, eyebrow appearance, and facial proportions in faceIdentity. Describe hair colour, type, texture, fall or movement, and facial hair when visibly present in hair. Use bodyPhysique only for apparent body or proportion details that are visibly supported; otherwise return an empty string. Keep each value factual, concise, editable, and suitable for a fictional CGI avatar prompt. Do not identify the person, guess their name, age, ancestry, ethnicity, nationality, religion, health, personality, attractiveness, or any non-visible trait. Do not mention the photo, image, reference, analysis, tattoos, or any instruction. Do not use arrows or Markdown.`,
+      content: `You extract only visible, non-sensitive appearance traits from a face reference for ${role}. Return only a strict JSON object with the English string fields "faceIdentity", "hair", "skinRealism", and "bodyPhysique". Describe only facial structure, eye appearance, eyebrow appearance, and facial proportions in faceIdentity. Describe only hair colour, type, texture, fall or movement, and facial hair when visibly present in hair. Describe only visible skin tone, undertone, texture, freckles, pores, or complexion details in skinRealism. Use bodyPhysique only for apparent body or proportion details that are visibly supported; otherwise return an empty string. Keep each value factual, concise, editable, and suitable for a fictional CGI avatar prompt. Do not identify the person, guess their name, age, ancestry, ethnicity, nationality, religion, health, personality, attractiveness, or any non-visible trait. Do not mention the photo, image, reference, analysis, tattoos, or any instruction. Do not use arrows or Markdown.`,
     },
     {
       role: "user" as const,
@@ -298,9 +287,10 @@ export async function extractFaceTraits(input: { method: PromptMethod; faceRefer
           properties: {
             faceIdentity: { type: "string", description: "Editable English face and identity traits." },
             hair: { type: "string", description: "Editable English hair traits." },
+            skinRealism: { type: "string", description: "Editable English visible skin tone and texture traits." },
             bodyPhysique: { type: "string", description: "Editable English body or proportion traits, when visibly supported." },
           },
-          required: ["faceIdentity", "hair", "bodyPhysique"],
+          required: ["faceIdentity", "hair", "skinRealism", "bodyPhysique"],
           additionalProperties: false,
         },
       },
@@ -313,16 +303,18 @@ export async function extractFaceTraits(input: { method: PromptMethod; faceRefer
     if (typeof content !== "string") continue;
 
     try {
-      const parsed = parseStructuredJson(content) as { traits?: unknown; faceIdentity?: unknown; hair?: unknown; bodyPhysique?: unknown };
+      const parsed = parseStructuredJson(content) as { traits?: unknown; faceIdentity?: unknown; hair?: unknown; skinRealism?: unknown; bodyPhysique?: unknown };
       const legacyTraits = cleanSection(parsed.traits);
       const faceIdentity = cleanSection(parsed.faceIdentity);
       const hair = cleanSection(parsed.hair);
+      const skinRealism = cleanSection(parsed.skinRealism);
       const bodyPhysique = cleanSection(parsed.bodyPhysique);
       const traits = legacyTraits !== EMPTY_SECTION_FALLBACK
         ? legacyTraits
         : [
             faceIdentity !== EMPTY_SECTION_FALLBACK ? `Face & identity: ${faceIdentity}` : "",
             hair !== EMPTY_SECTION_FALLBACK ? `Hair: ${hair}` : "",
+            skinRealism !== EMPTY_SECTION_FALLBACK ? `Skin & realism: ${skinRealism}` : "",
             bodyPhysique !== EMPTY_SECTION_FALLBACK ? `Body & proportions: ${bodyPhysique}` : "",
           ].filter(Boolean).join("\n");
       if (traits !== EMPTY_SECTION_FALLBACK) return traits;

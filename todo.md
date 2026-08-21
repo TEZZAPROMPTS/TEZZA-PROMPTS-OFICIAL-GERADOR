@@ -115,6 +115,11 @@
 - [x] Reintroduzir a preservação determinística dos traços nas seções permitidas, usando prosa natural sem prefixos técnicos.
 - [x] Definir por método quais blocos permanecem imutáveis e onde os traços editáveis podem aparecer sem alterar a base autorizada.
 - [x] Adicionar testes que comprovem simultaneamente a ausência de textos técnicos e a preservação natural dos traços permitidos.
+- [x] Distribuir traços faciais e de pele extraídos apenas em FACE & IDENTITY e SKIN & REALISM.
+- [x] Aplicar em HAIR a cor, o tipo, o caimento e o movimento descritos pela referência facial enviada.
+- [x] Validar em ambos os métodos que cada grupo de traços permanece em sua seção correta, sem textos técnicos.
+- [x] Cobrir a extração estruturada do campo skinRealism junto aos campos de rosto, cabelo e corpo.
+- [x] Validar de ponta a ponta, nos dois métodos, que os traços extraídos chegam somente às seções correspondentes do prompt final.
 
 ## Solicitação cancelada pela usuária
 
