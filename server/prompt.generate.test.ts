@@ -5,7 +5,7 @@ import { METHOD_SPECS, SECTION_DEFINITIONS } from "./promptEngine";
 const { invokeLLMMock } = vi.hoisted(() => ({ invokeLLMMock: vi.fn() }));
 vi.mock("./_core/llm", () => ({ invokeLLM: invokeLLMMock }));
 
-import { appRouter } from "./routers";
+import { appRouter, getFriendlyGenerationError } from "./routers";
 
 function createContext(): TrpcContext {
   return { user: null, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] };
@@ -69,6 +69,18 @@ describe("prompt.generate", () => {
     expect(String(request.messages[0].content)).toContain("Do not identify the person");
   });
 
+  it("retries once when the first face-trait response is malformed", async () => {
+    invokeLLMMock
+      .mockResolvedValueOnce({ choices: [{ message: { content: "partial-face-json" } }] })
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ traits: "Short black curly hair, brown eyes, and an angular face." }) } }] });
+
+    const caller = appRouter.createCaller(createContext());
+    const result = await caller.prompt.extractTraits({ method: "masculine", faceReferenceDataUrl: "data:image/jpeg;base64,ZmFrZQ==" });
+
+    expect(result.traits).toContain("Short black curly hair");
+    expect(invokeLLMMock).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps the face source and scene source independent from extraction through photo generation for both methods", async () => {
     const caller = appRouter.createCaller(createContext());
     const sections = Object.fromEntries(SECTION_DEFINITIONS.map(({ key }) => [key, `Scene-directed content for ${key}.`]));
@@ -100,6 +112,32 @@ describe("prompt.generate", () => {
   it("returns a controlled server error when generation fails", async () => {
     invokeLLMMock.mockResolvedValue({ choices: [{ message: { content: "not-valid-json" } }] });
     const caller = appRouter.createCaller(createContext());
-    await expect(caller.prompt.generate({ method: "feminine", mode: "text", userText: "Adult CGI avatar with a minimal luxury editorial direction." })).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+    await expect(caller.prompt.generate({ method: "feminine", mode: "text", userText: "Adult CGI avatar with a minimal luxury editorial direction." })).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: "A IA devolveu uma resposta incompleta. Tente gerar novamente; se necessário, use uma foto de cena mais simples." });
+  });
+
+  it("returns a specific validation message when a scene image is too large", async () => {
+    const caller = appRouter.createCaller(createContext());
+    const oversizedImage = `data:image/jpeg;base64,${"a".repeat(950_000)}`;
+
+    await expect(caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageDataUrl: oversizedImage })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("maps temporary AI unavailability to a helpful message", () => {
+    expect(getFriendlyGenerationError(new Error("LLM invoke failed: 503 temporary unavailable"), "prompt")).toBe(
+      "O serviço de IA está temporariamente indisponível. Aguarde alguns instantes e tente novamente."
+    );
+  });
+
+  it("retries once when the first structured prompt response is malformed", async () => {
+    const completeSections = Object.fromEntries(SECTION_DEFINITIONS.map(({ key }) => [key, `Recovered English content for ${key}.`]));
+    invokeLLMMock
+      .mockResolvedValueOnce({ choices: [{ message: { content: "partial-json" } }] })
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(completeSections) } }] });
+
+    const caller = appRouter.createCaller(createContext());
+    const result = await caller.prompt.generate({ method: "masculine", mode: "text", userText: "Adult CGI avatar with a concise editorial studio direction." });
+
+    expect(result.prompt.startsWith(METHOD_SPECS.masculine.opening)).toBe(true);
+    expect(invokeLLMMock).toHaveBeenCalledTimes(2);
   });
 });

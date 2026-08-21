@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { getMutationErrorMessage } from "@/lib/errorMessage";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { ArrowUpRight, Check, Copy, History, ImageIcon, LoaderCircle, RotateCcw, ScanFace, Sparkles, Type, Upload, X } from "lucide-react";
@@ -88,7 +89,7 @@ export default function Home() {
       });
       toast.success(`${METHOD_COPY[method].label} estruturado com sucesso.`);
     },
-    onError: error => toast.error(error.message || "Não foi possível gerar o prompt agora."),
+    onError: error => toast.error(getMutationErrorMessage(error, "Não foi possível gerar o prompt. Verifique a imagem de cena e tente novamente.")),
   });
 
   const extractTraitsMutation = trpc.prompt.extractTraits.useMutation({
@@ -96,7 +97,7 @@ export default function Home() {
       setPersonalTraits(data.traits);
       toast.success("Traços visuais preenchidos. Você pode editar antes de gerar.");
     },
-    onError: error => toast.error(error.message || "Não foi possível extrair os traços agora."),
+    onError: error => toast.error(getMutationErrorMessage(error, "Não foi possível extrair os traços. Use uma foto nítida do rosto e tente novamente.")),
   });
 
   const modeDescription = useMemo(() => mode === "text" ? "Descreva o conceito, o cenário e a direção visual. O motor organiza tudo no esqueleto fixo escolhido." : "Envie a imagem. A IA preserva os elementos visuais observáveis e aplica as regras do método selecionado.", [mode]);

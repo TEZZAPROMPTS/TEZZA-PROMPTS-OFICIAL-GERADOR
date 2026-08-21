@@ -135,7 +135,7 @@ PRESERVATION PRIORITY: Preserve all user-supplied facts. In photo mode, the visi
 
 ${priorityTraits}
 
-Rules without exception: never mention an image, photo, picture, reference, upload, source, analysis, the personal-traits label, or any “insert here” marker; never use arrows; never include Markdown or headings in a value; never describe tattoos; never refer to minors; never output an instruction, disclaimer, explanation, or code fence. Keep each value specific to its section, coherent, non-explicit, and suitable for a luxury editorial CGI rendering prompt.`;
+Rules without exception: never mention an image, photo, picture, reference, upload, source, analysis, the personal-traits label, or any “insert here” marker; never use arrows; never include Markdown or headings in a value; never describe tattoos; never refer to minors; never output an instruction, disclaimer, explanation, or code fence. Keep each value specific to its section, coherent, non-explicit, and suitable for a luxury editorial CGI rendering prompt. Write one concise sentence per section and keep every section under 55 words so the complete JSON response is never truncated.`;
 
   if (input.mode === "photo" && input.sceneImageDataUrl) {
     return [
@@ -164,12 +164,12 @@ export async function generateMethodPrompt(input: {
   sceneImageDataUrl?: string;
 }) {
   const method = input.method ?? "feminine";
-  const response = await invokeLLM({
+  const request = {
     model: "gemini-3-flash-preview",
     messages: buildGenerationMessages({ ...input, method }),
-    maxTokens: 4600,
+    maxTokens: 6400,
     response_format: {
-      type: "json_schema",
+      type: "json_schema" as const,
       json_schema: {
         name: `tezza_${method}_prompt_sections`,
         strict: true,
@@ -181,17 +181,23 @@ export async function generateMethodPrompt(input: {
         },
       },
     },
-  });
+  };
 
-  const content = response.choices[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("The generation service returned an empty response.");
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await invokeLLM(request);
+    const content = response.choices[0]?.message?.content;
 
-  try {
-    const parsed = parseStructuredJson(content) as Partial<PromptSections>;
-    return renderMethodPrompt(method, normalizeSections(parsed));
-  } catch {
-    throw new Error("The generation service returned an invalid structured response.");
+    if (typeof content === "string") {
+      try {
+        const parsed = parseStructuredJson(content) as Partial<PromptSections>;
+        return renderMethodPrompt(method, normalizeSections(parsed));
+      } catch {
+        // A retry below handles rare truncated or fenced model responses.
+      }
+    }
   }
+
+  throw new Error("The generation service returned an invalid structured response.");
 }
 
 export function buildFaceTraitMessages(input: { method: PromptMethod; faceReferenceDataUrl: string }) {
@@ -213,12 +219,12 @@ export function buildFaceTraitMessages(input: { method: PromptMethod; faceRefere
 }
 
 export async function extractFaceTraits(input: { method: PromptMethod; faceReferenceDataUrl: string }) {
-  const response = await invokeLLM({
+  const request = {
     model: "gemini-3-flash-preview",
     messages: buildFaceTraitMessages(input),
-    maxTokens: 700,
+    maxTokens: 1100,
     response_format: {
-      type: "json_schema",
+      type: "json_schema" as const,
       json_schema: {
         name: "tezza_face_traits",
         strict: true,
@@ -230,19 +236,23 @@ export async function extractFaceTraits(input: { method: PromptMethod; faceRefer
         },
       },
     },
-  });
+  };
 
-  const content = response.choices[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("The trait extraction service returned an empty response.");
-  try {
-    const parsed = parseStructuredJson(content) as { traits?: unknown };
-    const traits = cleanSection(parsed.traits);
-    if (traits === EMPTY_SECTION_FALLBACK) throw new Error("The trait extraction service returned no usable traits.");
-    return traits;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("no usable traits")) throw error;
-    throw new Error("The trait extraction service returned an invalid structured response.");
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await invokeLLM(request);
+    const content = response.choices[0]?.message?.content;
+    if (typeof content !== "string") continue;
+
+    try {
+      const parsed = parseStructuredJson(content) as { traits?: unknown };
+      const traits = cleanSection(parsed.traits);
+      if (traits !== EMPTY_SECTION_FALLBACK) return traits;
+    } catch {
+      // A retry below handles rare truncated or fenced model responses.
+    }
   }
+
+  throw new Error("The trait extraction service returned an invalid structured response.");
 }
 
 export const generateMethodOnePrompt = generateMethodPrompt;

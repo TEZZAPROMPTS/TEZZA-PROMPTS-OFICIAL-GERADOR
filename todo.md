@@ -43,3 +43,12 @@
 - [x] Executar e registrar validação fim a fim da extração de traços com geração por cena no Método Feminino.
 - [x] Executar e registrar validação fim a fim da extração de traços com geração por cena no Método Masculino.
 - [x] Adicionar teste de endpoint do fluxo combinado, garantindo fontes visuais independentes.
+- [x] Corrigir a falha interna que bloqueia a geração final do prompt com referências de rosto e cena.
+- [x] Validar a geração real com resposta estruturada e mensagens de erro úteis ao usuário.
+- [x] Exibir mensagens específicas para imagem grande, resposta de IA incompleta e indisponibilidade temporária da extração ou geração.
+- [x] Validar por HTTP uma resposta de erro estruturada e útil para o usuário.
+- [x] Validar em HTTP real o Método Masculino após a correção compartilhada de geração.
+- [x] Adicionar recuperação automática para respostas inválidas na extração de traços faciais.
+- [x] Exibir no cliente as mensagens específicas de validação recebidas do tRPC para imagens grandes e entradas inválidas.
+- [x] Cobrir e validar as mensagens para imagem grande, resposta incompleta e indisponibilidade temporária da IA.
+- [x] Verificar por HTTP o conteúdo de uma mensagem de erro útil, além da estrutura JSON da resposta.
