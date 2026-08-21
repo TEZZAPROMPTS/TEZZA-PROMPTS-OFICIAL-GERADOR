@@ -12,3 +12,14 @@
 - [x] Salvar uma versão validada do projeto para entrega.
 - [x] Adicionar testes de endpoint para os modos Texto e Foto, validações e falhas de geração.
 - [x] Validar os estados essenciais dos fluxos de Texto e Foto, incluindo pré-visualização, cópia e histórico de sessão.
+- [x] Adaptar a interface para a estética oficial monocromática, com fundo em grade, cartão arredondado e identidade Tezza.
+- [x] Renomear e apresentar o método atual como Método Feminino sem alterar suas regras de geração.
+- [x] Estruturar o seletor para comportar métodos adicionais com regras e textos fixos independentes.
+- [x] Inserir e validar o próximo método quando o usuário fornecer sua base estruturada.
+- [x] Adicionar um campo editável de traços pessoais e restrições obrigatórias por geração.
+- [x] Garantir que os traços informados tenham prioridade no prompt gerado, sem expor marcadores internos no resultado.
+- [x] Criar as constantes fixas, o esqueleto e as restrições do Método Masculino a partir da base fornecida.
+- [x] Incluir o Método Masculino como opção independente para geração por Texto e Foto.
+- [x] Validar que as aberturas e encerramentos dos métodos Feminino e Masculino não sejam misturados.
+- [x] Executar a validação de tipos, testes e revisão visual responsiva da atualização multi-método.
+- [x] Salvar uma versão validada da atualização com Método Feminino, Método Masculino e traços editáveis.
