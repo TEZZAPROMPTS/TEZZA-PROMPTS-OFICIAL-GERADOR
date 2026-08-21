@@ -112,7 +112,12 @@ describe("prompt.generate", () => {
 
       expect(generated.prompt.startsWith(METHOD_SPECS[method].opening)).toBe(true);
       expect(generated.prompt).toContain(METHOD_SPECS[method].closing);
-      expect(generated.prompt).toContain(`Mandatory identity traits to preserve: ${traits}`);
+      if (method === "feminine") {
+        expect(generated.prompt).toContain(`FACE & IDENTITY\n${METHOD_SPECS.feminine.faceIdentityBase}`);
+        expect(generated.prompt).not.toContain("Mandatory identity traits to preserve:");
+      } else {
+        expect(generated.prompt).toContain(`Mandatory identity traits to preserve: ${traits}`);
+      }
       expect(generated.prompt).toContain(`Mandatory hair traits to preserve: ${traits}`);
     }
 

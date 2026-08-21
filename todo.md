@@ -106,6 +106,8 @@
 - [x] Confirmar no GitHub os arquivos e o commit enviados ao novo repositório.
 - [x] Atualizar o nome exibido e o título do navegador para TEZZA PROMPTS OFICIAL GERADOR.
 - [x] Validar em desktop e celular a exibição legível da nova marca, sem alterar os fluxos do gerador.
+- [x] Restaurar FACE & IDENTITY ao texto-base fixo do método, sem acrescentar traços extraídos nessa seção.
+- [x] Cobrir por teste a fidelidade literal de FACE & IDENTITY e validar os dois métodos após a correção.
 
 ## Solicitação cancelada pela usuária
 

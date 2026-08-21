@@ -28,6 +28,7 @@ type MethodSpec = {
   opening: string;
   closing: string;
   baseDirection: string;
+  faceIdentityBase?: string;
 };
 
 export const METHOD_SPECS: Record<PromptMethod, MethodSpec> = {
@@ -40,6 +41,8 @@ export const METHOD_SPECS: Record<PromptMethod, MethodSpec> = {
       "Ultra-photorealistic Blender Cycles CGI render, cinematic realism, Seedream 5.0 beauty rendering, 8K UHD quality, physically accurate lighting and materials, realistic skin micro-detail, IMVU-inspired beauty repaint style, high-fidelity feminine avatar rendering, realistic depth of field, glossy beauty aesthetic, polished virtual influencer atmosphere, advanced ray tracing, realistic reflections, luxury editorial lighting, ultra-clean cinematic render quality, and clearly fictional CGI avatar aesthetics instead of a real photograph.",
     baseDirection:
       "This is the Female Method 1 Gemini structure. Keep an adult female fictional CGI avatar with polished virtual-influencer beauty, feminine anatomy, luxury editorial composition, Blender Cycles material realism, Seedream 5.0 beauty rendering, IMVU/The Sims virtual-avatar aesthetics, cinematic depth, and physically plausible lighting. The user direction or visible photo determines every individual attribute such as hair, face, pose, clothing, accessories, body proportions, setting, and lighting; never default to the example woman's blonde hair, Brazil jersey, apartment, piercing, or any other sample-only detail unless the user direction or visible photo supports it.",
+    faceIdentityBase:
+      "Adult female CGI avatar with delicate feminine facial structure, soft jawline, symmetrical facial proportions, smooth pale skin tone, large almond-shaped eyes, glossy lips, slim nose bridge, and softly sculpted cheekbones. Skin rendering contains realistic texture, subtle pores, luminous highlights, and refined beauty realism while maintaining a stylized CGI avatar appearance instead of photoreal human rendering.",
   },
   masculine: {
     label: "Método Masculino",
@@ -113,14 +116,21 @@ function valueAfterLabel(source: string, label: string, followingLabels: string[
 }
 
 function buildTraitBlocks(personalTraits?: string): TraitBlocks {
-  const traits = personalTraits ? cleanSection(personalTraits) : "";
-  if (!traits || traits === EMPTY_SECTION_FALLBACK) return { faceIdentity: "", hair: "", bodyPhysique: "" };
+  const source = personalTraits?.trim() ?? "";
+  const traits = cleanSection(source);
+  if (!source || traits === EMPTY_SECTION_FALLBACK) return { faceIdentity: "", hair: "", bodyPhysique: "" };
 
-  const faceIdentity = valueAfterLabel(traits, "Face(?: & identity)?", ["Hair", "Body(?: & proportions| & physique)?"]);
-  const hair = valueAfterLabel(traits, "Hair", ["Face(?: & identity)?", "Body(?: & proportions| & physique)?"]);
-  const bodyPhysique = valueAfterLabel(traits, "Body(?: & proportions| & physique)?", ["Face(?: & identity)?", "Hair"]);
+  const faceIdentity = cleanSection(valueAfterLabel(source, "Face(?: & identity)?", ["Hair", "Body(?: & proportions| & physique)?"]));
+  const hair = cleanSection(valueAfterLabel(source, "Hair", ["Face(?: & identity)?", "Body(?: & proportions| & physique)?"]));
+  const bodyPhysique = cleanSection(valueAfterLabel(source, "Body(?: & proportions| & physique)?", ["Face(?: & identity)?", "Hair"]));
 
-  if (faceIdentity || hair || bodyPhysique) return { faceIdentity, hair, bodyPhysique };
+  if (faceIdentity !== EMPTY_SECTION_FALLBACK || hair !== EMPTY_SECTION_FALLBACK || bodyPhysique !== EMPTY_SECTION_FALLBACK) {
+    return {
+      faceIdentity: faceIdentity === EMPTY_SECTION_FALLBACK ? "" : faceIdentity,
+      hair: hair === EMPTY_SECTION_FALLBACK ? "" : hair,
+      bodyPhysique: bodyPhysique === EMPTY_SECTION_FALLBACK ? "" : bodyPhysique,
+    };
+  }
 
   return {
     faceIdentity: traits,
@@ -129,14 +139,14 @@ function buildTraitBlocks(personalTraits?: string): TraitBlocks {
   };
 }
 
-function applyMandatoryIdentityTraits(sections: PromptSections, personalTraits?: string) {
+function applyMandatoryIdentityTraits(method: PromptMethod, sections: PromptSections, personalTraits?: string) {
   const traits = personalTraits ? cleanSection(personalTraits) : "";
   if (!traits || traits === EMPTY_SECTION_FALLBACK) return sections;
   const blocks = buildTraitBlocks(personalTraits);
 
   return {
     ...sections,
-    faceIdentity: `Mandatory identity traits to preserve: ${blocks.faceIdentity || traits} ${sections.faceIdentity}`.trim(),
+    faceIdentity: method === "masculine" ? `Mandatory identity traits to preserve: ${blocks.faceIdentity || traits} ${sections.faceIdentity}`.trim() : sections.faceIdentity,
     hair: blocks.hair ? `Mandatory hair traits to preserve: ${blocks.hair} ${sections.hair}`.trim() : sections.hair,
     bodyPhysique: blocks.bodyPhysique ? `Mandatory body and proportion traits to preserve: ${blocks.bodyPhysique} ${sections.bodyPhysique}`.trim() : sections.bodyPhysique,
   };
@@ -146,9 +156,10 @@ export function renderMethodPrompt(method: PromptMethod, sections: PromptSection
   const spec = METHOD_SPECS[method];
   const preparedSections = {
     ...sections,
+    faceIdentity: spec.faceIdentityBase ?? sections.faceIdentity,
     styleRenderQuality: spec.closing,
   };
-  const lockedSections = applyMandatoryIdentityTraits(preparedSections, personalTraits);
+  const lockedSections = applyMandatoryIdentityTraits(method, preparedSections, personalTraits);
   const body = SECTION_DEFINITIONS.map(({ key, heading }) => `${heading}\n${lockedSections[key]}`).join("\n\n");
   return `${spec.opening}\n\n${body}`;
 }
@@ -168,7 +179,7 @@ export function buildGenerationMessages(input: {
   const spec = METHOD_SPECS[method];
   const traits = input.personalTraits?.trim();
   const priorityTraits = traits
-    ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nThese are the highest-priority rules. Translate them into natural English prompt prose and apply them faithfully in the relevant sections. They override generic base styling whenever there is a conflict. You MUST include all face-identity traits in FACE & IDENTITY, all hair-specific traits in HAIR, and all body-specific traits in BODY & PHYSIQUE. The renderer will independently lock the complete trait set into FACE & IDENTITY as a final safeguard. Do not expose this label, any “insert here” marker, or the original Portuguese wording in the final prompt.`
+    ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nThese are the highest-priority rules. Translate them into natural English prompt prose and apply them faithfully in the relevant sections. They override generic base styling whenever there is a conflict. ${method === "feminine" ? "FACE & IDENTITY is an immutable authorized base section for this method and must not be modified with extracted traits. Apply hair-specific traits in HAIR and body-specific traits in BODY & PHYSIQUE." : "Include face-identity traits in FACE & IDENTITY, hair-specific traits in HAIR, and body-specific traits in BODY & PHYSIQUE."} Do not expose this label, any “insert here” marker, or the original Portuguese wording in the final prompt.`
     : "No additional personal traits were supplied.";
 
   const system = `You are the content engine for TEZZA PROMPTS. Produce only a strict JSON object matching the supplied schema. Write every value in polished English prose. The final renderer—not you—will add the method's immutable opening, immutable STYLE & RENDER QUALITY text, and the 14 immutable section headings.

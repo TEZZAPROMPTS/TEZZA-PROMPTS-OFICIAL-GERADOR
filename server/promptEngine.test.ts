@@ -73,6 +73,23 @@ describe("Tezza prompt methods", () => {
     expect(normalized.hair).not.toMatch(/reference|image|tattoo|→/i);
   });
 
+  it("keeps the authorized Feminine FACE & IDENTITY block literal when personal traits are supplied", () => {
+    const personalTraits = "Face & Identity: Oval face with freckles and blue-grey eyes.\nHair: Long platinum blonde hair.\nBody & Physique: Slender shoulders.";
+    const feminine = renderMethodPrompt("feminine", {
+      ...completeSections,
+      faceIdentity: "This generated facial description must not replace the authorized base.",
+    }, personalTraits);
+    const masculine = renderMethodPrompt("masculine", completeSections, personalTraits);
+
+    expect(feminine).toContain(`FACE & IDENTITY\n${METHOD_SPECS.feminine.faceIdentityBase}`);
+    expect(feminine).not.toContain("Mandatory identity traits to preserve:");
+    expect(feminine).not.toContain("Oval face with freckles and blue-grey eyes.");
+    expect(feminine).not.toContain("This generated facial description must not replace the authorized base.");
+    expect(feminine).toContain("Mandatory hair traits to preserve: Long platinum blonde hair.");
+    expect(feminine).toContain("Mandatory body and proportion traits to preserve: Slender shoulders.");
+    expect(masculine).toContain("Mandatory identity traits to preserve: Oval face with freckles and blue-grey eyes.");
+  });
+
   it("keeps each supplied base distinct while enforcing the fixed fourteen-section contract", () => {
     const feminineSystem = String(buildGenerationMessages({ method: "feminine", mode: "text", userText: "A refined city portrait." })[0].content);
     const masculineSystem = String(buildGenerationMessages({ method: "masculine", mode: "text", userText: "A refined city portrait." })[0].content);
