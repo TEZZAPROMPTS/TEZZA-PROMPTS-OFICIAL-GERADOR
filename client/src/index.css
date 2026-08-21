@@ -4,6 +4,119 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.955 0.012 70);
+  --foreground: oklch(0.25 0.035 325);
+  --card: oklch(0.985 0.007 74);
+  --card-foreground: oklch(0.25 0.035 325);
+  --popover: oklch(0.985 0.007 74);
+  --popover-foreground: oklch(0.25 0.035 325);
+  --primary: oklch(0.33 0.09 326);
+  --primary-foreground: oklch(0.98 0.004 70);
+  --secondary: oklch(0.91 0.024 332);
+  --secondary-foreground: oklch(0.30 0.06 326);
+  --muted: oklch(0.92 0.011 72);
+  --muted-foreground: oklch(0.52 0.025 325);
+  --accent: oklch(0.80 0.12 346);
+  --accent-foreground: oklch(0.25 0.035 325);
+  --border: oklch(0.84 0.022 331);
+  --input: oklch(0.88 0.014 72);
+  --ring: oklch(0.64 0.14 338);
+}
+
+.dark {
+  --background: oklch(0.18 0.027 323);
+  --foreground: oklch(0.95 0.017 75);
+  --card: oklch(0.22 0.034 324);
+  --card-foreground: oklch(0.95 0.017 75);
+  --popover: oklch(0.22 0.034 324);
+  --popover-foreground: oklch(0.95 0.017 75);
+  --primary: oklch(0.80 0.13 344);
+  --primary-foreground: oklch(0.19 0.028 324);
+  --secondary: oklch(0.29 0.044 325);
+  --secondary-foreground: oklch(0.95 0.017 75);
+  --muted: oklch(0.27 0.03 323);
+  --muted-foreground: oklch(0.72 0.028 328);
+  --accent: oklch(0.72 0.11 345);
+  --accent-foreground: oklch(0.19 0.028 324);
+  --border: oklch(0.39 0.046 326);
+  --input: oklch(0.30 0.032 324);
+  --ring: oklch(0.77 0.14 344);
+}
+
+* { border-color: var(--border); }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Manrope", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, textarea { font: inherit; }
+
+.font-display { font-family: "Playfair Display", Georgia, serif; }
+.font-mono-editorial { font-family: "DM Mono", monospace; }
+
+.ambient-bg {
+  background:
+    radial-gradient(circle at 13% 4%, oklch(0.61 0.13 342 / 0.28), transparent 28rem),
+    radial-gradient(circle at 88% 22%, oklch(0.75 0.10 81 / 0.16), transparent 24rem),
+    linear-gradient(135deg, oklch(0.18 0.027 323), oklch(0.22 0.034 324) 48%, oklch(0.16 0.022 317));
+}
+
+.hairline { background: linear-gradient(90deg, transparent, oklch(0.80 0.13 344 / 0.9), transparent); }
+
+.glass-panel {
+  background: linear-gradient(145deg, oklch(0.25 0.038 324 / 0.94), oklch(0.20 0.028 322 / 0.93));
+  border: 1px solid oklch(0.74 0.09 342 / 0.24);
+  box-shadow: 0 25px 70px oklch(0.07 0.015 320 / 0.36), inset 0 1px 0 oklch(1 0 0 / 0.07);
+  backdrop-filter: blur(18px);
+}
+
+.editor-scroll::-webkit-scrollbar { width: 8px; }
+.editor-scroll::-webkit-scrollbar-thumb { background: oklch(0.49 0.06 329); border-radius: 999px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise-in { animation: rise-in 450ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
