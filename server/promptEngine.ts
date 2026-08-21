@@ -27,6 +27,7 @@ type MethodSpec = {
   avatarDescription: string;
   opening: string;
   closing: string;
+  baseDirection: string;
 };
 
 export const METHOD_SPECS: Record<PromptMethod, MethodSpec> = {
@@ -37,6 +38,8 @@ export const METHOD_SPECS: Record<PromptMethod, MethodSpec> = {
       "Ultra-realistic cinematic avatar 3D female portrait, Blender Cycles render in CGI, inspired by Seedream 5.0 beauty realism and high-end IMVU/The Sims virtual aesthetics. Clearly a fictional digital avatar and not a real photograph. Hyper-detailed virtual influencer design with stylized CGI beauty proportions, luxury editorial aesthetics, advanced cinematic lighting, ultra-polished 3D rendering, and “TEZZA PROMPTS” text at the bottom center in elegant minimalist typography.",
     closing:
       "Ultra-photorealistic Blender Cycles CGI render, cinematic realism, Seedream 5.0 beauty rendering, 8K UHD quality, physically accurate lighting and materials, realistic skin micro-detail, IMVU-inspired beauty repaint style, high-fidelity feminine avatar rendering, realistic depth of field, glossy beauty aesthetic, polished virtual influencer atmosphere, advanced ray tracing, realistic reflections, luxury editorial lighting, ultra-clean cinematic render quality, and clearly fictional CGI avatar aesthetics instead of a real photograph.",
+    baseDirection:
+      "This is the Female Method 1 Gemini structure. Keep an adult female fictional CGI avatar with polished virtual-influencer beauty, feminine anatomy, luxury editorial composition, Blender Cycles material realism, Seedream 5.0 beauty rendering, IMVU/The Sims virtual-avatar aesthetics, cinematic depth, and physically plausible lighting. The user direction or visible photo determines every individual attribute such as hair, face, pose, clothing, accessories, body proportions, setting, and lighting; never default to the example woman's blonde hair, Brazil jersey, apartment, piercing, or any other sample-only detail unless the user direction or visible photo supports it.",
   },
   masculine: {
     label: "Método Masculino",
@@ -45,6 +48,8 @@ export const METHOD_SPECS: Record<PromptMethod, MethodSpec> = {
       "Ultra-realistic cinematic avatar 3D male portrait, Blender Cycles render in CGI, inspired by Seedream 5.0 realism and high-end IMVU/The Sims virtual aesthetics. Clearly a fictional digital avatar and not a real photograph. Hyper-detailed virtual influencer design with stylized CGI masculine proportions, luxury editorial aesthetics, advanced cinematic lighting, ultra-polished 3D rendering, and “TEZZA PROMPTS” text at the bottom center in elegant minimalist typography.",
     closing:
       "Ultra-photorealistic Blender Cycles CGI render, cinematic realism, Seedream 5.0 masculine beauty rendering, 8K UHD quality, physically accurate lighting and materials, realistic skin micro-detail, IMVU-inspired avatar repaint aesthetics, high-fidelity masculine CGI rendering, realistic atmospheric depth, polished virtual influencer styling, advanced ray tracing, realistic reflections, luxury editorial lighting, ultra-clean cinematic render quality, and clearly fictional CGI-avatar aesthetics instead of a real photograph.",
+    baseDirection:
+      "This is the Male Method 1 Gemini structure. Keep an adult male fictional CGI avatar with polished virtual-influencer realism, masculine anatomy, luxury editorial composition, Blender Cycles material realism, Seedream 5.0 masculine beauty rendering, IMVU/The Sims virtual-avatar aesthetics, cinematic depth, and physically plausible lighting. The user direction or visible photo determines every individual attribute such as hair, face, pose, clothing, accessories, body proportions, setting, and lighting; never default to the example man's black curls, beard, balcony, necklace, shirtless styling, or any other sample-only detail unless the user direction or visible photo supports it.",
   },
 };
 
@@ -66,8 +71,8 @@ function cleanSection(value: unknown) {
   if (typeof value !== "string") return EMPTY_SECTION_FALLBACK;
   const noReferenceLanguage = value
     .replace(/```[\s\S]*?```/g, "")
-    .replace(/\b(?:this|the|a|an|from the|based on the)\s+(?:reference\s+)?(?:image|photo|picture)\b/gi, "the provided visual details")
-    .replace(/\b(?:reference\s+)?(?:image|photo|picture)\b/gi, "provided visual details")
+    .replace(/\b(?:this|the|a|an|from the|based on the)\s+(?:reference\s+)?(?:image|photo|picture)\b/gi, "the established visual identity")
+    .replace(/\b(?:reference\s+)?(?:image|photo|picture)\b/gi, "the established visual identity")
     .replace(/[→➜➝]/g, "")
     .trim();
 
@@ -107,12 +112,16 @@ export function buildGenerationMessages(input: {
   const spec = METHOD_SPECS[method];
   const traits = input.personalTraits?.trim();
   const priorityTraits = traits
-    ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nTreat these user-entered traits as the highest-priority visual direction. Integrate them faithfully into the appropriate sections, without exposing this label or any placeholder in the final prompt.`
+    ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nThese are the highest-priority rules. Translate them into natural English prompt prose and apply them faithfully in the relevant sections. They override generic base styling whenever there is a conflict. Do not expose this label, any “insert here” marker, or the original Portuguese wording in the final prompt.`
     : "No additional personal traits were supplied.";
 
-  const system = `You are the content engine for TEZZA PROMPTS. Produce only a strict JSON object matching the supplied schema. Write every value in polished English prose. The final renderer—not you—will add the fixed opening, fixed ending, and section headings.
+  const system = `You are the content engine for TEZZA PROMPTS. Produce only a strict JSON object matching the supplied schema. Write every value in polished English prose. The final renderer—not you—will add the method's immutable opening, immutable closing, and the 14 immutable section headings.
 
-Create a premium, fictional CGI ${spec.avatarDescription} prompt. The avatar is always clearly fictional and never a real photograph. Preserve all user-supplied visual facts. When a photo is supplied, extract only what is visibly present: facial structure, hair, pose, hands, framing, camera angle, expression, clothing, accessories, proportions, lighting, environment, composition, and visual identity. Do not invent, substitute, embellish, exaggerate, or reinterpret visible elements.
+METHOD IDENTITY: ${spec.baseDirection}
+
+OUTPUT CONTRACT: Populate exactly these sections, in their intended scope: CAMERA & COMPOSITION (aspect ratio, shot, framing, angle, focus); POSE & BODY POSITIONING (stance, torso, arms, hands, physical positioning); HEAD POSITION & GAZE (head angle, chin, eye direction); FACIAL EXPRESSION (emotion and mouth/eye expression); FACE & IDENTITY (adult ${spec.avatarDescription}, facial structure, skin tone and identity); HAIR (colour, type, texture, fall and movement); ACCESSORIES & DETAILS (only visibly supported accessories and grooming); OUTFIT (garments, fabrics and styling); BODY & PHYSIQUE (proportions and anatomy); SKIN & REALISM (pores, highlights and CGI material detail); LIGHTING (flash, ambient sources, reflections and shadows); ENVIRONMENT (location and background); MOOD & AESTHETIC (editorial atmosphere); STYLE & RENDER QUALITY (CGI render language only).
+
+PRESERVATION PRIORITY: Preserve all user-supplied facts. In photo mode, the visible direction is absolute for facial structure, hairstyle, expression, pose, hand placement, body position, camera angle, framing, composition, perspective, lighting, clothing, accessories, proportions, and visual identity. Do not invent, substitute, embellish, exaggerate, or reinterpret those elements. In text mode, follow the user's requested direction with the same discipline.
 
 ${priorityTraits}
 

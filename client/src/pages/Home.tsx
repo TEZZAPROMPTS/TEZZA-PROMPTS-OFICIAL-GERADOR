@@ -122,13 +122,12 @@ export default function Home() {
   return (
     <div className="black-grid min-h-screen overflow-x-hidden text-white">
       <main className="relative mx-auto max-w-[1380px] px-4 pb-14 pt-5 sm:px-8 lg:px-12">
-        <header className="flex items-center justify-between border-b border-white/15 pb-5">
+        <header className="flex items-center border-b border-white/15 pb-5">
           <div className="flex items-center gap-3"><span className="bow-mark" aria-hidden="true" /><div><p className="font-display text-3xl leading-none tracking-[-0.05em]">Tezza</p><p className="mt-1 font-soft text-[9px] font-bold tracking-[0.22em] text-white/55">PROMPTS OFICIAL</p></div></div>
-          <div className="hidden items-center gap-3 sm:flex"><span className="method-tag">MÉTODO 01</span><span className="font-soft text-[10px] tracking-[0.17em] text-white/55">TEXTO / FOTO</span></div>
         </header>
 
         <section className="pb-10 pt-12 text-center sm:pt-16">
-          <div className="mx-auto max-w-3xl"><p className="font-soft text-[10px] font-bold tracking-[0.26em] text-white/50">TEZZA PROMPTS OFICIAL ·</p><h1 className="mt-4 font-display text-5xl leading-[0.92] tracking-[-0.055em] sm:text-6xl">Gere prompts<br /><em className="font-normal text-white/60">perfeitos em segundos.</em></h1><p className="mx-auto mt-5 max-w-xl font-soft text-sm leading-6 text-white/58">Escolha o método, descreva sua ideia ou envie uma foto e receba um prompt otimizado para criar imagens realistas e profissionais.</p></div>
+          <div className="mx-auto max-w-4xl"><p className="font-display text-6xl leading-none tracking-[-0.06em] text-white sm:text-7xl">TEZZA PROMPTS OFICIAL</p><h1 className="mt-5 font-display text-5xl leading-[0.92] tracking-[-0.055em] text-white/88 sm:text-6xl">Gere prompts<br /><em className="font-normal text-white/60">perfeitos em segundos.</em></h1><p className="mx-auto mt-5 max-w-xl font-soft text-sm leading-6 text-white/58">Escolha o método, descreva sua ideia ou envie uma foto e receba um prompt otimizado para criar imagens realistas e profissionais.</p></div>
         </section>
 
         <section className="tezza-card mx-auto max-w-6xl rounded-[2rem] p-5 sm:p-8 lg:p-10">

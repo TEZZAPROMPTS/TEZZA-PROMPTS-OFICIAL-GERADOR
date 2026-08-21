@@ -50,4 +50,16 @@ describe("Tezza prompt methods", () => {
     });
     expect(normalized.hair).not.toMatch(/reference|image|tattoo|→/i);
   });
+
+  it("keeps each supplied base distinct while enforcing the fixed fourteen-section contract", () => {
+    const feminineSystem = String(buildGenerationMessages({ method: "feminine", mode: "text", userText: "A refined city portrait." })[0].content);
+    const masculineSystem = String(buildGenerationMessages({ method: "masculine", mode: "text", userText: "A refined city portrait." })[0].content);
+
+    expect(feminineSystem).toContain("Female Method 1 Gemini structure");
+    expect(feminineSystem).toContain("never default to the example woman's blonde hair");
+    expect(masculineSystem).toContain("Male Method 1 Gemini structure");
+    expect(masculineSystem).toContain("never default to the example man's black curls");
+    expect(feminineSystem).toContain("Populate exactly these sections");
+    expect(masculineSystem).toContain("14 immutable section headings");
+  });
 });

@@ -26,3 +26,11 @@
 - [x] Substituir o texto principal do hero pela nova mensagem de geração rápida de prompts.
 - [x] Corrigir a mutação tRPC de geração que está recebendo HTML em vez de JSON.
 - [x] Validar a rota de geração com uma resposta JSON de sucesso e uma resposta de erro estruturada.
+- [x] Revalidar e reconstruir as regras fixas do Método Feminino a partir da base reenviada pelo usuário.
+- [x] Fixar o prompt Feminino com o texto inicial, 14 seções em ordem e texto final exatamente como a base reenviada.
+- [x] Garantir que os traços editáveis do Feminino sejam prioridade e não exibam marcadores internos, setas ou referência a imagem no resultado.
+- [x] Revalidar e reconstruir as regras fixas do Método Masculino a partir da base reenviada pelo usuário.
+- [x] Fixar o prompt Masculino com o texto inicial, 14 seções em ordem e texto final exatamente como a base reenviada.
+- [x] Garantir que os traços editáveis do Masculino sejam prioridade e não exibam marcadores internos, setas ou referência a imagem no resultado.
+- [x] Aumentar o destaque de “TEZZA PROMPTS OFICIAL” no hero e remover os rótulos “MÉTODO 01” e “TEXTO / FOTO” do cabeçalho.
+- [x] Testar que ambos os métodos seguem suas respectivas bases sem mistura de regras.
