@@ -25,7 +25,7 @@ export const appRouter = router({
             mode: z.enum(["text", "photo"]),
             userText: z.string().trim().min(8).max(2400).optional(),
             personalTraits: z.string().trim().max(1800).optional(),
-            imageDataUrl: z.string().max(6_500_000).optional(),
+            imageDataUrl: z.string().max(950_000, "The image is still too large. Please choose a smaller image.").optional(),
           })
           .superRefine((value, ctx) => {
             if (value.mode === "text" && !value.userText) ctx.addIssue({ code: "custom", message: "Write a little more about the desired prompt." });

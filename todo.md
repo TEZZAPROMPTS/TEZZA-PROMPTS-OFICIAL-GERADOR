@@ -24,3 +24,5 @@
 - [x] Executar a validação de tipos, testes e revisão visual responsiva da atualização multi-método.
 - [x] Salvar uma versão validada da atualização com Método Feminino, Método Masculino e traços editáveis.
 - [x] Substituir o texto principal do hero pela nova mensagem de geração rápida de prompts.
+- [x] Corrigir a mutação tRPC de geração que está recebendo HTML em vez de JSON.
+- [x] Validar a rota de geração com uma resposta JSON de sucesso e uma resposta de erro estruturada.

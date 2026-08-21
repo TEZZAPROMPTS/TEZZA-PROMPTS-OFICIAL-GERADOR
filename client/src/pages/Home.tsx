@@ -10,7 +10,8 @@ type PromptMethod = "feminine" | "masculine";
 type PromptHistoryEntry = { id: string; createdAt: number; mode: Mode; method: PromptMethod; label: string; prompt: string };
 
 const SESSION_HISTORY_KEY = "tezza-prompts-session-history";
-const MAX_FILE_SIZE = 4 * 1024 * 1024;
+const MAX_UPLOAD_FILE_SIZE = 8 * 1024 * 1024;
+const MAX_MUTATION_IMAGE_LENGTH = 900_000;
 const METHOD_COPY: Record<PromptMethod, { label: string; subtitle: string; input: string }> = {
   feminine: { label: "Método Feminino", subtitle: "Avatar CGI feminino", input: "Uma avatar adulta em um rooftop de São Paulo à noite, cabelo cacheado solto, vestido preto minimalista e flash de smartphone..." },
   masculine: { label: "Método Masculino", subtitle: "Avatar CGI masculino", input: "Um avatar adulto em uma varanda urbana noturna, cabelo curto preto, visual editorial e luz de flash cinematográfica..." },
@@ -18,6 +19,38 @@ const METHOD_COPY: Record<PromptMethod, { label: string; subtitle: string; input
 
 function makeEntry(prompt: string, mode: Mode, method: PromptMethod, label: string): PromptHistoryEntry {
   return { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, createdAt: Date.now(), mode, method, label: label.trim().slice(0, 72) || (mode === "photo" ? "Direção visual pela foto" : "Nova direção em texto"), prompt };
+}
+
+async function compressImageForGeneration(file: File): Promise<string> {
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const candidate = new Image();
+      candidate.onload = () => resolve(candidate);
+      candidate.onerror = () => reject(new Error("Não foi possível preparar esta imagem."));
+      candidate.src = sourceUrl;
+    });
+
+    const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+    const targetSizes = [1600, 1280, 1024, 880, 720];
+    const qualities = [0.82, 0.72, 0.63, 0.55, 0.48];
+
+    for (let index = 0; index < targetSizes.length; index += 1) {
+      const scale = Math.min(1, targetSizes[index] / longestSide);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Não foi possível preparar esta imagem.");
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", qualities[index]);
+      if (dataUrl.length <= MAX_MUTATION_IMAGE_LENGTH) return dataUrl;
+    }
+
+    throw new Error("A imagem não pôde ser otimizada. Tente uma foto menor ou com menos detalhes.");
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
 }
 
 export default function Home() {
@@ -56,15 +89,20 @@ export default function Home() {
 
   const modeDescription = useMemo(() => mode === "text" ? "Descreva o conceito, o cenário e a direção visual. O motor organiza tudo no esqueleto fixo escolhido." : "Envie a imagem. A IA preserva os elementos visuais observáveis e aplica as regras do método selecionado.", [mode]);
 
-  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     setImageError("");
     if (!file) return;
     if (!file.type.startsWith("image/")) return setImageError("Escolha uma imagem em JPG, PNG ou WEBP.");
-    if (file.size > MAX_FILE_SIZE) return setImageError("A imagem deve ter até 4 MB.");
-    const reader = new FileReader();
-    reader.onload = () => { setImageDataUrl(String(reader.result)); setImageName(file.name.replace(/\.[^.]+$/, "")); };
-    reader.readAsDataURL(file);
+    if (file.size > MAX_UPLOAD_FILE_SIZE) return setImageError("A imagem deve ter até 8 MB.");
+    try {
+      const optimizedImage = await compressImageForGeneration(file);
+      setImageDataUrl(optimizedImage);
+      setImageName(file.name.replace(/\.[^.]+$/, ""));
+    } catch (error) {
+      setImageDataUrl(null);
+      setImageError(error instanceof Error ? error.message : "Não foi possível preparar esta imagem.");
+    }
   }
 
   function clearImage() { setImageDataUrl(null); setImageName(""); setImageError(""); if (fileInputRef.current) fileInputRef.current.value = ""; }
@@ -104,7 +142,7 @@ export default function Home() {
             <div className="panel rounded-[1.65rem] p-5 sm:p-6">
               <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-start"><div><p className="font-soft text-[10px] font-bold tracking-[0.2em] text-white/46">DIREÇÃO DE ENTRADA</p><h3 className="mt-1 font-display text-3xl tracking-[-0.04em]">{METHOD_COPY[method].label}</h3></div><div className="mode-switch"><button onClick={() => setMode("text")} className={cn(mode === "text" && "active")}><Type className="h-3.5 w-3.5" /> Texto</button><button onClick={() => setMode("photo")} className={cn(mode === "photo" && "active")}><ImageIcon className="h-3.5 w-3.5" /> Foto</button></div></div>
               <p className="mt-5 font-soft text-sm leading-6 text-white/57">{modeDescription}</p>
-              {mode === "text" ? <div className="mt-6"><label htmlFor="creative-direction" className="field-label">DIREÇÃO CRIATIVA</label><textarea id="creative-direction" value={direction} onChange={event => setDirection(event.target.value)} placeholder={METHOD_COPY[method].input} className="mono-input min-h-[164px]" /><p className="mt-2 text-right font-soft text-[10px] text-white/35">{direction.length} / 2400</p></div> : <div className="mt-6"><input ref={fileInputRef} onChange={handlePhotoChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="photo-upload" type="file" />{imageDataUrl ? <div className="relative overflow-hidden rounded-3xl border border-white/15"><img src={imageDataUrl} alt="Prévia da imagem selecionada" className="h-[210px] w-full object-cover opacity-85" /><div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-4 pt-12"><p className="min-w-0 truncate font-soft text-xs">{imageName}</p><button onClick={clearImage} className="grid h-8 w-8 place-items-center rounded-full border border-white/35 bg-black/80 text-white"><X className="h-4 w-4" /></button></div></div> : <label htmlFor="photo-upload" className="upload-box"><Upload className="h-5 w-5" /><p>Enviar imagem de referência</p><small>JPG, PNG ou WEBP · até 4 MB</small></label>}{imageError && <p className="mt-3 font-soft text-xs text-white/72">{imageError}</p>}</div>}
+              {mode === "text" ? <div className="mt-6"><label htmlFor="creative-direction" className="field-label">DIREÇÃO CRIATIVA</label><textarea id="creative-direction" value={direction} onChange={event => setDirection(event.target.value)} placeholder={METHOD_COPY[method].input} className="mono-input min-h-[164px]" /><p className="mt-2 text-right font-soft text-[10px] text-white/35">{direction.length} / 2400</p></div> : <div className="mt-6"><input ref={fileInputRef} onChange={handlePhotoChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="photo-upload" type="file" />{imageDataUrl ? <div className="relative overflow-hidden rounded-3xl border border-white/15"><img src={imageDataUrl} alt="Prévia da imagem selecionada" className="h-[210px] w-full object-cover opacity-85" /><div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-4 pt-12"><p className="min-w-0 truncate font-soft text-xs">{imageName}</p><button onClick={clearImage} className="grid h-8 w-8 place-items-center rounded-full border border-white/35 bg-black/80 text-white"><X className="h-4 w-4" /></button></div></div> : <label htmlFor="photo-upload" className="upload-box"><Upload className="h-5 w-5" /><p>Enviar imagem de referência</p><small>JPG, PNG ou WEBP · até 8 MB · otimizada antes de enviar</small></label>}{imageError && <p className="mt-3 font-soft text-xs text-white/72">{imageError}</p>}</div>}
               <div className="mt-6"><label htmlFor="personal-traits" className="field-label">TRAÇOS E RESTRIÇÕES OBRIGATÓRIAS <span>EDITÁVEL</span></label><textarea id="personal-traits" value={personalTraits} onChange={event => setPersonalTraits(event.target.value)} placeholder="Ex.: manter cabelo loiro; liso, com caimento fluido; rosto oval; olhos castanhos; preservar proporções e identidade visual; não incluir tatuagens..." className="mono-input min-h-[138px]" /><p className="mt-2 font-soft text-[11px] leading-5 text-white/42">Esses traços têm prioridade e entram no prompt final de forma natural, sem mostrar “INSIRA AQUI”.</p></div>
               <Button onClick={generatePrompt} disabled={generateMutation.isPending || (mode === "text" ? direction.trim().length < 8 : !imageDataUrl)} className="tezza-button mt-7 h-12 w-full rounded-full font-soft text-sm font-bold text-black"><>{generateMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Estruturando...</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar {METHOD_COPY[method].label} <ArrowUpRight className="ml-1 h-4 w-4" /></>}</></Button>
               <p className="mt-3 text-center font-soft text-[9px] font-bold tracking-[0.13em] text-white/39">INGLÊS · ESTRUTURA FIXA · TEXTO COPIÁVEL</p>

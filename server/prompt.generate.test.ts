@@ -50,6 +50,14 @@ describe("prompt.generate", () => {
     expect(invokeLLMMock).not.toHaveBeenCalled();
   });
 
+  it("rejects an oversized image payload before it reaches the generation service", async () => {
+    const caller = appRouter.createCaller(createContext());
+    const oversizedImage = `data:image/jpeg;base64,${"a".repeat(950_000)}`;
+
+    await expect(caller.prompt.generate({ method: "feminine", mode: "photo", imageDataUrl: oversizedImage })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(invokeLLMMock).not.toHaveBeenCalled();
+  });
+
   it("returns a controlled server error when generation fails", async () => {
     invokeLLMMock.mockResolvedValue({ choices: [{ message: { content: "not-valid-json" } }] });
     const caller = appRouter.createCaller(createContext());
