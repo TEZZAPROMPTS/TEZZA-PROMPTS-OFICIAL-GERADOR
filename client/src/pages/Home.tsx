@@ -2,8 +2,9 @@ import { Button } from "@/components/ui/button";
 import { getMutationErrorMessage } from "@/lib/errorMessage";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
+import { getImageProgressInfo, isImageProgressActive, type ImageKind, type ImageProgressStage } from "@shared/imageProgress";
 import { ArrowUpRight, Check, Copy, History, ImageIcon, LoaderCircle, RotateCcw, ScanFace, Sparkles, Type, Upload, X } from "lucide-react";
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type Mode = "text" | "photo";
@@ -76,6 +77,23 @@ async function uploadImage(file: File, kind: "face" | "scene"): Promise<Uploaded
   return payload as UploadedImage;
 }
 
+export function ImageUploadProgress({ kind, stage }: { kind: ImageKind; stage: ImageProgressStage }) {
+  if (!isImageProgressActive(stage)) return null;
+  const progress = getImageProgressInfo(kind, stage);
+
+  return (
+    <div className="image-progress" role="status" aria-live="polite">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0"><p>{progress.label}</p><span>{progress.detail}</span></div>
+        <strong>{progress.value}%</strong>
+      </div>
+      <div className="image-progress-track" role="progressbar" aria-label={progress.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.value} aria-valuetext={progress.detail}>
+        <span className="image-progress-fill" style={{ width: `${progress.value}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [method, setMethod] = useState<PromptMethod>("feminine");
   const [mode, setMode] = useState<Mode>("text");
@@ -86,11 +104,13 @@ export default function Home() {
   const [sceneImageName, setSceneImageName] = useState("");
   const [sceneError, setSceneError] = useState("");
   const [sceneUploadPending, setSceneUploadPending] = useState(false);
+  const [sceneProgressStage, setSceneProgressStage] = useState<ImageProgressStage>("idle");
   const [faceReferenceKey, setFaceReferenceKey] = useState<string | null>(null);
   const [faceReferencePreviewUrl, setFaceReferencePreviewUrl] = useState<string | null>(null);
   const [faceReferenceName, setFaceReferenceName] = useState("");
   const [faceError, setFaceError] = useState("");
   const [faceUploadPending, setFaceUploadPending] = useState(false);
+  const [faceProgressStage, setFaceProgressStage] = useState<ImageProgressStage>("idle");
   const [faceTraitsStatus, setFaceTraitsStatus] = useState<"idle" | "extracting" | "ready" | "error">("idle");
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [history, setHistory] = useState<PromptHistoryEntry[]>([]);
@@ -109,6 +129,7 @@ export default function Home() {
 
   const generateMutation = trpc.prompt.generate.useMutation({
     onSuccess: data => {
+      if (mode === "photo") setSceneProgressStage("ready");
       setGeneratedPrompt(data.prompt);
       const entry = makeEntry(data.prompt, mode, method, mode === "text" ? direction : sceneImageName);
       setHistory(current => {
@@ -118,22 +139,28 @@ export default function Home() {
       });
       toast.success(`${METHOD_COPY[method].label} estruturado com sucesso.`);
     },
-    onError: error => toast.error(getMutationErrorMessage(error, "Não foi possível gerar o prompt. Verifique a imagem de cena e tente novamente.")),
+    onError: error => {
+      if (mode === "photo") setSceneProgressStage("error");
+      toast.error(getMutationErrorMessage(error, "Não foi possível gerar o prompt. Verifique a imagem de cena e tente novamente."));
+    },
   });
 
   const extractTraitsMutation = trpc.prompt.extractTraits.useMutation({
     onSuccess: data => {
       setPersonalTraits(data.traits);
       setFaceTraitsStatus("ready");
+      setFaceProgressStage("ready");
       toast.success("Traços visuais preenchidos. Você pode editar antes de gerar.");
     },
     onError: error => {
       setFaceTraitsStatus("error");
+      setFaceProgressStage("error");
       toast.error(getMutationErrorMessage(error, "Não foi possível extrair os traços. Use uma foto nítida do rosto e tente novamente."));
     },
   });
 
   const modeDescription = useMemo(() => mode === "text" ? "Descreva o conceito, o cenário e a direção visual. O motor organiza tudo no esqueleto fixo escolhido." : "Envie a imagem. A IA preserva os elementos visuais observáveis e aplica as regras do método selecionado.", [mode]);
+  const faceProgress = getImageProgressInfo("face", faceProgressStage);
 
   async function handleScenePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -148,16 +175,21 @@ export default function Home() {
     setSceneImageKey(null);
     setSceneImageName(file.name.replace(/\.[^.]+$/, ""));
     setSceneUploadPending(true);
+    setSceneProgressStage("preparing");
     try {
       const optimizedImage = await optimizeImageForUpload(file);
+      if (uploadId !== sceneUploadIdRef.current) return;
+      setSceneProgressStage("uploading");
       const uploaded = await uploadImage(optimizedImage, "scene");
       if (uploadId !== sceneUploadIdRef.current) return;
       setSceneImageKey(uploaded.key);
+      setSceneProgressStage("ready");
     } catch (error) {
       if (uploadId !== sceneUploadIdRef.current) return;
       URL.revokeObjectURL(previewUrl);
       setSceneImagePreviewUrl(null);
       setSceneImageKey(null);
+      setSceneProgressStage("error");
       setSceneError(error instanceof Error ? error.message : "Não foi possível preparar esta imagem.");
     } finally {
       if (uploadId === sceneUploadIdRef.current) setSceneUploadPending(false);
@@ -178,12 +210,16 @@ export default function Home() {
     setFaceReferenceName(file.name.replace(/\.[^.]+$/, ""));
     setFaceUploadPending(true);
     setFaceTraitsStatus("extracting");
+    setFaceProgressStage("preparing");
     try {
       const optimizedImage = await optimizeImageForUpload(file);
+      if (uploadId !== faceUploadIdRef.current) return;
+      setFaceProgressStage("uploading");
       const uploaded = await uploadImage(optimizedImage, "face");
       if (uploadId !== faceUploadIdRef.current) return;
       setFaceReferenceKey(uploaded.key);
       setFaceUploadPending(false);
+      setFaceProgressStage("analyzing");
       await extractTraitsMutation.mutateAsync({ method, faceReferenceKey: uploaded.key });
     } catch (error) {
       if (uploadId !== faceUploadIdRef.current) return;
@@ -191,22 +227,25 @@ export default function Home() {
       setFaceReferencePreviewUrl(null);
       setFaceReferenceKey(null);
       setFaceTraitsStatus("error");
+      setFaceProgressStage("error");
       setFaceError(error instanceof Error ? error.message : "Não foi possível preparar esta imagem.");
     } finally {
       if (uploadId === faceUploadIdRef.current) setFaceUploadPending(false);
     }
   }
 
-  function clearSceneImage() { ++sceneUploadIdRef.current; if (sceneImagePreviewUrl) URL.revokeObjectURL(sceneImagePreviewUrl); setSceneImageKey(null); setSceneImagePreviewUrl(null); setSceneImageName(""); setSceneError(""); setSceneUploadPending(false); if (sceneFileInputRef.current) sceneFileInputRef.current.value = ""; }
-  function clearFaceReference() { ++faceUploadIdRef.current; if (faceReferencePreviewUrl) URL.revokeObjectURL(faceReferencePreviewUrl); setFaceReferenceKey(null); setFaceReferencePreviewUrl(null); setFaceReferenceName(""); setFaceError(""); setFaceUploadPending(false); setFaceTraitsStatus("idle"); extractTraitsMutation.reset(); if (faceFileInputRef.current) faceFileInputRef.current.value = ""; }
+  function clearSceneImage() { ++sceneUploadIdRef.current; if (sceneImagePreviewUrl) URL.revokeObjectURL(sceneImagePreviewUrl); setSceneImageKey(null); setSceneImagePreviewUrl(null); setSceneImageName(""); setSceneError(""); setSceneUploadPending(false); setSceneProgressStage("idle"); if (sceneFileInputRef.current) sceneFileInputRef.current.value = ""; }
+  function clearFaceReference() { ++faceUploadIdRef.current; if (faceReferencePreviewUrl) URL.revokeObjectURL(faceReferencePreviewUrl); setFaceReferenceKey(null); setFaceReferencePreviewUrl(null); setFaceReferenceName(""); setFaceError(""); setFaceUploadPending(false); setFaceProgressStage("idle"); setFaceTraitsStatus("idle"); extractTraitsMutation.reset(); if (faceFileInputRef.current) faceFileInputRef.current.value = ""; }
   function extractFaceTraits() {
     if (!faceReferenceKey) return setFaceError("Aguarde o envio da foto de rosto antes de extrair os traços.");
     setFaceTraitsStatus("extracting");
+    setFaceProgressStage("analyzing");
     extractTraitsMutation.mutate({ method, faceReferenceKey });
   }
   function generatePrompt() {
     if (mode === "text") return generateMutation.mutate({ method, mode, userText: direction, personalTraits });
     if (!sceneImageKey) return setSceneError("Aguarde o envio da imagem de cena antes de gerar pelo modo Foto.");
+    setSceneProgressStage("analyzing");
     generateMutation.mutate({ method, mode, sceneImageKey, personalTraits });
   }
   async function copyPrompt(prompt = generatedPrompt) {
@@ -246,18 +285,18 @@ export default function Home() {
                   <label className="field-label">IMAGEM DA CENA <span>POSE, ROUPA E AMBIENTE</span></label>
                   <input ref={sceneFileInputRef} onChange={handleScenePhotoChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="scene-upload" type="file" />
                   {sceneImagePreviewUrl ? (
-                    <div className="relative overflow-hidden rounded-3xl border border-white/15"><img src={sceneImagePreviewUrl} alt="Prévia da cena selecionada" className="h-[210px] w-full object-cover opacity-85" /><div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-4 pt-12"><p className="min-w-0 truncate font-soft text-xs">{sceneUploadPending ? "Enviando imagem..." : sceneImageName}</p><button onClick={clearSceneImage} className="grid h-8 w-8 place-items-center rounded-full border border-white/35 bg-black/80 text-white" aria-label="Remover imagem de cena"><X className="h-4 w-4" /></button></div></div>
+                    <><div className="relative overflow-hidden rounded-3xl border border-white/15"><img src={sceneImagePreviewUrl} alt="Prévia da cena selecionada" className="h-[210px] w-full object-cover opacity-85" /><div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-4 pt-12"><p className="min-w-0 truncate font-soft text-xs">{sceneUploadPending ? "Enviando imagem..." : sceneImageName}</p><button onClick={clearSceneImage} className="grid h-8 w-8 place-items-center rounded-full border border-white/35 bg-black/80 text-white" aria-label="Remover imagem de cena"><X className="h-4 w-4" /></button></div></div><ImageUploadProgress kind="scene" stage={sceneProgressStage} /></>
                   ) : <label htmlFor="scene-upload" className="upload-box"><ImageIcon className="h-5 w-5" /><p>Enviar imagem da cena</p><small>Pose, roupa, ambiente e composição · até 8 MB</small></label>}
                   {sceneError && <p className="mt-3 font-soft text-xs text-white/72">{sceneError}</p>}
                 </div>
               )}
               <div className="mt-6 rounded-2xl border border-white/12 bg-white/[0.025] p-4">
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="field-label mb-1">ROSTO DE REFERÊNCIA <span>EXTRAÇÃO AUTOMÁTICA</span></p><p className="font-soft text-[11px] leading-5 text-white/45">Ao enviar a foto, os traços serão preenchidos automaticamente. A cena continua sendo uma imagem separada.</p></div><button type="button" onClick={extractFaceTraits} disabled={!faceReferenceKey || faceUploadPending || extractTraitsMutation.isPending} className="copy-button shrink-0 disabled:opacity-40">{faceUploadPending || extractTraitsMutation.isPending ? <><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Extraindo...</> : <><ScanFace className="h-3.5 w-3.5" /> Atualizar traços</>}</button></div>
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="field-label mb-1">ROSTO DE REFERÊNCIA <span>EXTRAÇÃO AUTOMÁTICA</span></p><p className="font-soft text-[11px] leading-5 text-white/45">Ao enviar a foto, os traços serão preenchidos automaticamente. A cena continua sendo uma imagem separada.</p></div><button type="button" onClick={extractFaceTraits} disabled={!faceReferenceKey || faceUploadPending || extractTraitsMutation.isPending} className="copy-button shrink-0 disabled:opacity-40">{faceUploadPending || extractTraitsMutation.isPending ? <><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> {faceProgress.label || "Extraindo..."}</> : <><ScanFace className="h-3.5 w-3.5" /> Atualizar traços</>}</button></div>
                 <input ref={faceFileInputRef} onChange={handleFaceReferenceChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="face-reference-upload" type="file" />
                 {faceReferencePreviewUrl ? (
-                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-2"><img src={faceReferencePreviewUrl} alt="Prévia do rosto de referência" className="h-14 w-14 rounded-lg object-cover" /><p className="min-w-0 flex-1 truncate font-soft text-xs text-white/72">{faceUploadPending ? "Enviando foto..." : faceReferenceName}</p><button onClick={clearFaceReference} className="grid h-8 w-8 place-items-center rounded-full border border-white/20 text-white/75" aria-label="Remover rosto de referência"><X className="h-4 w-4" /></button></div>
+                  <><div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-2"><img src={faceReferencePreviewUrl} alt="Prévia do rosto de referência" className="h-14 w-14 rounded-lg object-cover" /><p className="min-w-0 flex-1 truncate font-soft text-xs text-white/72">{faceUploadPending ? "Enviando foto..." : faceReferenceName}</p><button onClick={clearFaceReference} className="grid h-8 w-8 place-items-center rounded-full border border-white/20 text-white/75" aria-label="Remover rosto de referência"><X className="h-4 w-4" /></button></div><ImageUploadProgress kind="face" stage={faceProgressStage} /></>
                 ) : <label htmlFor="face-reference-upload" className="mt-4 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-white/20 px-4 py-3 font-soft text-xs text-white/58 transition hover:border-white/50 hover:text-white"><ScanFace className="h-4 w-4" /> Enviar foto do rosto para extrair traços</label>}
-                {faceTraitsStatus === "extracting" && <p className="mt-3 font-soft text-xs text-white/62">Lendo o rosto e preenchendo os traços editáveis automaticamente...</p>}
+                {faceTraitsStatus === "extracting" && <p className="mt-3 font-soft text-xs text-white/62">{faceProgress.detail || "Lendo o rosto e preenchendo os traços editáveis automaticamente..."}</p>}
                 {faceTraitsStatus === "ready" && <p className="mt-3 font-soft text-xs text-white/62">Traços preenchidos. Você pode revisá-los antes de gerar.</p>}
                 {faceError && <p className="mt-3 font-soft text-xs text-white/72">{faceError}</p>}
               </div>

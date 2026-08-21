@@ -68,3 +68,11 @@
 - [x] Validar no navegador que o upload de rosto preenche os traços sem resposta HTML.
 - [x] Criar uma rota multipart segura, validada por tipo e assinatura binária, que armazene imagens temporárias de rosto e cena no S3.
 - [x] Atualizar testes de contrato para aceitar somente referências seguras de arquivo nas mutações multimodais.
+- [x] Adicionar barra de progresso animada para as etapas de preparo, envio e análise da foto de rosto.
+- [x] Adicionar barra de progresso animada para o preparo e envio da imagem de cena.
+- [x] Validar os estados de progresso em desktop e dispositivo móvel, incluindo anúncios acessíveis de status.
+- [x] Exibir o estágio de análise da imagem de cena enquanto a geração multimodal estiver em andamento.
+- [x] Validar em execução os estados ativos da barra para rosto e cena, incluindo os estágios de preparo, envio e análise.
+- [x] Adicionar teste de interface para confirmar a barra de progresso e seus atributos acessíveis durante estados ativos.
+- [x] Validar por cenário ponta a ponta os estágios ativos de preparo, envio e análise para rosto e cena.
+- [x] Registrar os anúncios acessíveis das barras em execução durante upload e análise.

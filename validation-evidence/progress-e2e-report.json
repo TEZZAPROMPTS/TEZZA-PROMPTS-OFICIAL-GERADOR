@@ -1,0 +1,48 @@
+{
+  "faceDesktop": {
+    "preparing": {
+      "label": "Preparando a foto",
+      "ariaLive": "polite",
+      "progressRole": "progressbar",
+      "value": "20",
+      "detail": "Otimizando o rosto para o envio"
+    },
+    "uploading": {
+      "label": "Enviando a foto",
+      "ariaLive": "polite",
+      "progressRole": "progressbar",
+      "value": "54",
+      "detail": "Guardando a referência com segurança"
+    },
+    "analyzing": {
+      "label": "Analisando os traços",
+      "ariaLive": "polite",
+      "progressRole": "progressbar",
+      "value": "84",
+      "detail": "Identificando características visuais editáveis"
+    }
+  },
+  "sceneMobile": {
+    "preparing": {
+      "label": "Preparando a imagem",
+      "ariaLive": "polite",
+      "progressRole": "progressbar",
+      "value": "24",
+      "detail": "Otimizando a foto para o envio"
+    },
+    "uploading": {
+      "label": "Enviando a imagem",
+      "ariaLive": "polite",
+      "progressRole": "progressbar",
+      "value": "68",
+      "detail": "Guardando a direção visual com segurança"
+    },
+    "analyzing": {
+      "label": "Lendo a direção visual",
+      "ariaLive": "polite",
+      "progressRole": "progressbar",
+      "value": "84",
+      "detail": "Organizando pose, roupa e ambiente"
+    }
+  }
+}
