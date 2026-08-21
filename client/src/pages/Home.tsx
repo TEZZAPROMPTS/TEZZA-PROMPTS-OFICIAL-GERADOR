@@ -65,6 +65,7 @@ export default function Home() {
   const [faceReferenceDataUrl, setFaceReferenceDataUrl] = useState<string | null>(null);
   const [faceReferenceName, setFaceReferenceName] = useState("");
   const [faceError, setFaceError] = useState("");
+  const [faceTraitsStatus, setFaceTraitsStatus] = useState<"idle" | "extracting" | "ready" | "error">("idle");
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [history, setHistory] = useState<PromptHistoryEntry[]>([]);
   const [copied, setCopied] = useState(false);
@@ -95,9 +96,13 @@ export default function Home() {
   const extractTraitsMutation = trpc.prompt.extractTraits.useMutation({
     onSuccess: data => {
       setPersonalTraits(data.traits);
+      setFaceTraitsStatus("ready");
       toast.success("Traços visuais preenchidos. Você pode editar antes de gerar.");
     },
-    onError: error => toast.error(getMutationErrorMessage(error, "Não foi possível extrair os traços. Use uma foto nítida do rosto e tente novamente.")),
+    onError: error => {
+      setFaceTraitsStatus("error");
+      toast.error(getMutationErrorMessage(error, "Não foi possível extrair os traços. Use uma foto nítida do rosto e tente novamente."));
+    },
   });
 
   const modeDescription = useMemo(() => mode === "text" ? "Descreva o conceito, o cenário e a direção visual. O motor organiza tudo no esqueleto fixo escolhido." : "Envie a imagem. A IA preserva os elementos visuais observáveis e aplica as regras do método selecionado.", [mode]);
@@ -128,16 +133,20 @@ export default function Home() {
       const optimizedImage = await compressImageForGeneration(file);
       setFaceReferenceDataUrl(optimizedImage);
       setFaceReferenceName(file.name.replace(/\.[^.]+$/, ""));
+      setFaceTraitsStatus("extracting");
+      extractTraitsMutation.mutate({ method, faceReferenceDataUrl: optimizedImage });
     } catch (error) {
       setFaceReferenceDataUrl(null);
+      setFaceTraitsStatus("error");
       setFaceError(error instanceof Error ? error.message : "Não foi possível preparar esta imagem.");
     }
   }
 
   function clearSceneImage() { setSceneImageDataUrl(null); setSceneImageName(""); setSceneError(""); if (sceneFileInputRef.current) sceneFileInputRef.current.value = ""; }
-  function clearFaceReference() { setFaceReferenceDataUrl(null); setFaceReferenceName(""); setFaceError(""); if (faceFileInputRef.current) faceFileInputRef.current.value = ""; }
+  function clearFaceReference() { setFaceReferenceDataUrl(null); setFaceReferenceName(""); setFaceError(""); setFaceTraitsStatus("idle"); extractTraitsMutation.reset(); if (faceFileInputRef.current) faceFileInputRef.current.value = ""; }
   function extractFaceTraits() {
     if (!faceReferenceDataUrl) return setFaceError("Envie uma foto de rosto para extrair os traços.");
+    setFaceTraitsStatus("extracting");
     extractTraitsMutation.mutate({ method, faceReferenceDataUrl });
   }
   function generatePrompt() {
@@ -188,15 +197,17 @@ export default function Home() {
                 </div>
               )}
               <div className="mt-6 rounded-2xl border border-white/12 bg-white/[0.025] p-4">
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="field-label mb-1">ROSTO DE REFERÊNCIA <span>OPCIONAL</span></p><p className="font-soft text-[11px] leading-5 text-white/45">Usado somente para preencher os traços pessoais. A cena continua sendo uma imagem separada.</p></div><button type="button" onClick={extractFaceTraits} disabled={!faceReferenceDataUrl || extractTraitsMutation.isPending} className="copy-button shrink-0 disabled:opacity-40">{extractTraitsMutation.isPending ? <><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Extraindo...</> : <><ScanFace className="h-3.5 w-3.5" /> Extrair traços</>}</button></div>
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="field-label mb-1">ROSTO DE REFERÊNCIA <span>EXTRAÇÃO AUTOMÁTICA</span></p><p className="font-soft text-[11px] leading-5 text-white/45">Ao enviar a foto, os traços serão preenchidos automaticamente. A cena continua sendo uma imagem separada.</p></div><button type="button" onClick={extractFaceTraits} disabled={!faceReferenceDataUrl || extractTraitsMutation.isPending} className="copy-button shrink-0 disabled:opacity-40">{extractTraitsMutation.isPending ? <><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Extraindo...</> : <><ScanFace className="h-3.5 w-3.5" /> Atualizar traços</>}</button></div>
                 <input ref={faceFileInputRef} onChange={handleFaceReferenceChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="face-reference-upload" type="file" />
                 {faceReferenceDataUrl ? (
                   <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-2"><img src={faceReferenceDataUrl} alt="Prévia do rosto de referência" className="h-14 w-14 rounded-lg object-cover" /><p className="min-w-0 flex-1 truncate font-soft text-xs text-white/72">{faceReferenceName}</p><button onClick={clearFaceReference} className="grid h-8 w-8 place-items-center rounded-full border border-white/20 text-white/75" aria-label="Remover rosto de referência"><X className="h-4 w-4" /></button></div>
                 ) : <label htmlFor="face-reference-upload" className="mt-4 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-white/20 px-4 py-3 font-soft text-xs text-white/58 transition hover:border-white/50 hover:text-white"><ScanFace className="h-4 w-4" /> Enviar foto do rosto para extrair traços</label>}
+                {faceTraitsStatus === "extracting" && <p className="mt-3 font-soft text-xs text-white/62">Lendo o rosto e preenchendo os traços editáveis automaticamente...</p>}
+                {faceTraitsStatus === "ready" && <p className="mt-3 font-soft text-xs text-white/62">Traços preenchidos. Você pode revisá-los antes de gerar.</p>}
                 {faceError && <p className="mt-3 font-soft text-xs text-white/72">{faceError}</p>}
               </div>
               <div className="mt-6"><label htmlFor="personal-traits" className="field-label">TRAÇOS E RESTRIÇÕES OBRIGATÓRIAS <span>EDITÁVEL</span></label><textarea id="personal-traits" value={personalTraits} onChange={event => setPersonalTraits(event.target.value)} placeholder="Ex.: manter cabelo loiro; liso, com caimento fluido; rosto oval; olhos castanhos; preservar proporções e identidade visual; não incluir tatuagens..." className="mono-input min-h-[138px]" /><p className="mt-2 font-soft text-[11px] leading-5 text-white/42">A foto de rosto pode preencher estes traços automaticamente. Revise ou edite antes de gerar.</p></div>
-              <Button onClick={generatePrompt} disabled={generateMutation.isPending || (mode === "text" ? direction.trim().length < 8 : !sceneImageDataUrl)} className="tezza-button mt-7 h-12 w-full rounded-full font-soft text-sm font-bold text-black"><>{generateMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Estruturando...</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar {METHOD_COPY[method].label} <ArrowUpRight className="ml-1 h-4 w-4" /></>}</></Button>
+              <Button onClick={generatePrompt} disabled={generateMutation.isPending || extractTraitsMutation.isPending || (Boolean(faceReferenceDataUrl) && faceTraitsStatus !== "ready") || (mode === "text" ? direction.trim().length < 8 : !sceneImageDataUrl)} className="tezza-button mt-7 h-12 w-full rounded-full font-soft text-sm font-bold text-black"><>{generateMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Estruturando...</> : extractTraitsMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Lendo os traços do rosto...</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar {METHOD_COPY[method].label} <ArrowUpRight className="ml-1 h-4 w-4" /></>}</></Button>
               <p className="mt-3 text-center font-soft text-[9px] font-bold tracking-[0.13em] text-white/39">INGLÊS · ESTRUTURA FIXA · TEXTO COPIÁVEL</p>
             </div>
 

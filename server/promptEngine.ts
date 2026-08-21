@@ -101,8 +101,50 @@ function parseStructuredJson(content: string): unknown {
   return JSON.parse(json);
 }
 
-export function renderMethodPrompt(method: PromptMethod, sections: PromptSections) {
-  const body = SECTION_DEFINITIONS.map(({ key, heading }) => `${heading}\n${sections[key]}`).join("\n\n");
+type TraitBlocks = { faceIdentity: string; hair: string; bodyPhysique: string };
+
+function valueAfterLabel(source: string, label: string, followingLabels: string[]) {
+  const start = source.search(new RegExp(`(?:^|\\n)${label}\\s*:`, "i"));
+  if (start < 0) return "";
+  const afterStart = source.slice(start).replace(new RegExp(`^(?:\\n)?${label}\\s*:\\s*`, "i"), "");
+  const nextLabels = followingLabels.map(next => next.replace(/[&]/g, "\\&")).join("|");
+  const endMatch = afterStart.match(new RegExp(`\\n(?:${nextLabels})\\s*:`, "i"));
+  return (endMatch ? afterStart.slice(0, endMatch.index) : afterStart).trim();
+}
+
+function buildTraitBlocks(personalTraits?: string): TraitBlocks {
+  const traits = personalTraits ? cleanSection(personalTraits) : "";
+  if (!traits || traits === EMPTY_SECTION_FALLBACK) return { faceIdentity: "", hair: "", bodyPhysique: "" };
+
+  const faceIdentity = valueAfterLabel(traits, "Face(?: & identity)?", ["Hair", "Body(?: & proportions| & physique)?"]);
+  const hair = valueAfterLabel(traits, "Hair", ["Face(?: & identity)?", "Body(?: & proportions| & physique)?"]);
+  const bodyPhysique = valueAfterLabel(traits, "Body(?: & proportions| & physique)?", ["Face(?: & identity)?", "Hair"]);
+
+  if (faceIdentity || hair || bodyPhysique) return { faceIdentity, hair, bodyPhysique };
+
+  return {
+    faceIdentity: traits,
+    hair: /\b(hair|hairstyle|curl\w*|wave\w*|straight|coily|braid\w*|bang\w*|fringe|blonde|brunette|black hair|brown hair|red hair)\b/i.test(traits) ? traits : "",
+    bodyPhysique: /\b(body|build|physique|proportion|shoulder|waist|height|lean|athletic|curv|slim|broad)\b/i.test(traits) ? traits : "",
+  };
+}
+
+function applyMandatoryIdentityTraits(sections: PromptSections, personalTraits?: string) {
+  const traits = personalTraits ? cleanSection(personalTraits) : "";
+  if (!traits || traits === EMPTY_SECTION_FALLBACK) return sections;
+  const blocks = buildTraitBlocks(personalTraits);
+
+  return {
+    ...sections,
+    faceIdentity: `Mandatory identity traits to preserve: ${blocks.faceIdentity || traits} ${sections.faceIdentity}`.trim(),
+    hair: blocks.hair ? `Mandatory hair traits to preserve: ${blocks.hair} ${sections.hair}`.trim() : sections.hair,
+    bodyPhysique: blocks.bodyPhysique ? `Mandatory body and proportion traits to preserve: ${blocks.bodyPhysique} ${sections.bodyPhysique}`.trim() : sections.bodyPhysique,
+  };
+}
+
+export function renderMethodPrompt(method: PromptMethod, sections: PromptSections, personalTraits?: string) {
+  const lockedSections = applyMandatoryIdentityTraits(sections, personalTraits);
+  const body = SECTION_DEFINITIONS.map(({ key, heading }) => `${heading}\n${lockedSections[key]}`).join("\n\n");
   const spec = METHOD_SPECS[method];
   return `${spec.opening}\n\n${body}\n\n${spec.closing}`;
 }
@@ -122,7 +164,7 @@ export function buildGenerationMessages(input: {
   const spec = METHOD_SPECS[method];
   const traits = input.personalTraits?.trim();
   const priorityTraits = traits
-    ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nThese are the highest-priority rules. Translate them into natural English prompt prose and apply them faithfully in the relevant sections. They override generic base styling whenever there is a conflict. Do not expose this label, any “insert here” marker, or the original Portuguese wording in the final prompt.`
+    ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nThese are the highest-priority rules. Translate them into natural English prompt prose and apply them faithfully in the relevant sections. They override generic base styling whenever there is a conflict. You MUST include all face-identity traits in FACE & IDENTITY, all hair-specific traits in HAIR, and all body-specific traits in BODY & PHYSIQUE. The renderer will independently lock the complete trait set into FACE & IDENTITY as a final safeguard. Do not expose this label, any “insert here” marker, or the original Portuguese wording in the final prompt.`
     : "No additional personal traits were supplied.";
 
   const system = `You are the content engine for TEZZA PROMPTS. Produce only a strict JSON object matching the supplied schema. Write every value in polished English prose. The final renderer—not you—will add the method's immutable opening, immutable closing, and the 14 immutable section headings.
@@ -190,7 +232,7 @@ export async function generateMethodPrompt(input: {
     if (typeof content === "string") {
       try {
         const parsed = parseStructuredJson(content) as Partial<PromptSections>;
-        return renderMethodPrompt(method, normalizeSections(parsed));
+        return renderMethodPrompt(method, normalizeSections(parsed), input.personalTraits);
       } catch {
         // A retry below handles rare truncated or fenced model responses.
       }
@@ -206,7 +248,7 @@ export function buildFaceTraitMessages(input: { method: PromptMethod; faceRefere
   return [
     {
       role: "system" as const,
-      content: `You extract only visible, non-sensitive appearance traits from a face reference for ${role}. Return only a strict JSON object with one English string field named "traits". Describe visible facial structure, apparent skin tone, eye appearance, eyebrow appearance, hair colour, hair type, hair texture, hair fall or movement, facial hair when visibly present, and apparent facial proportions. Keep the description factual, concise, editable, and suitable for a fictional CGI avatar prompt. Do not identify the person, guess their name, age, ancestry, ethnicity, nationality, religion, health, personality, attractiveness, or any non-visible trait. Do not mention the photo, image, reference, analysis, tattoos, or any instruction. Do not use arrows or Markdown.`,
+      content: `You extract only visible, non-sensitive appearance traits from a face reference for ${role}. Return only a strict JSON object with the English string fields "faceIdentity", "hair", and "bodyPhysique". Describe visible facial structure, apparent skin tone, eye appearance, eyebrow appearance, and facial proportions in faceIdentity. Describe hair colour, type, texture, fall or movement, and facial hair when visibly present in hair. Use bodyPhysique only for apparent body or proportion details that are visibly supported; otherwise return an empty string. Keep each value factual, concise, editable, and suitable for a fictional CGI avatar prompt. Do not identify the person, guess their name, age, ancestry, ethnicity, nationality, religion, health, personality, attractiveness, or any non-visible trait. Do not mention the photo, image, reference, analysis, tattoos, or any instruction. Do not use arrows or Markdown.`,
     },
     {
       role: "user" as const,
@@ -230,8 +272,12 @@ export async function extractFaceTraits(input: { method: PromptMethod; faceRefer
         strict: true,
         schema: {
           type: "object",
-          properties: { traits: { type: "string", description: "Editable English visual face traits." } },
-          required: ["traits"],
+          properties: {
+            faceIdentity: { type: "string", description: "Editable English face and identity traits." },
+            hair: { type: "string", description: "Editable English hair traits." },
+            bodyPhysique: { type: "string", description: "Editable English body or proportion traits, when visibly supported." },
+          },
+          required: ["faceIdentity", "hair", "bodyPhysique"],
           additionalProperties: false,
         },
       },
@@ -244,8 +290,18 @@ export async function extractFaceTraits(input: { method: PromptMethod; faceRefer
     if (typeof content !== "string") continue;
 
     try {
-      const parsed = parseStructuredJson(content) as { traits?: unknown };
-      const traits = cleanSection(parsed.traits);
+      const parsed = parseStructuredJson(content) as { traits?: unknown; faceIdentity?: unknown; hair?: unknown; bodyPhysique?: unknown };
+      const legacyTraits = cleanSection(parsed.traits);
+      const faceIdentity = cleanSection(parsed.faceIdentity);
+      const hair = cleanSection(parsed.hair);
+      const bodyPhysique = cleanSection(parsed.bodyPhysique);
+      const traits = legacyTraits !== EMPTY_SECTION_FALLBACK
+        ? legacyTraits
+        : [
+            faceIdentity !== EMPTY_SECTION_FALLBACK ? `Face & identity: ${faceIdentity}` : "",
+            hair !== EMPTY_SECTION_FALLBACK ? `Hair: ${hair}` : "",
+            bodyPhysique !== EMPTY_SECTION_FALLBACK ? `Body & proportions: ${bodyPhysique}` : "",
+          ].filter(Boolean).join("\n");
       if (traits !== EMPTY_SECTION_FALLBACK) return traits;
     } catch {
       // A retry below handles rare truncated or fenced model responses.

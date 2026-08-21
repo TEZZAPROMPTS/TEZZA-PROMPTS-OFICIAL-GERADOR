@@ -32,6 +32,9 @@ describe("prompt.generate", () => {
     expect(result.method).toBe("masculine");
     expect(result.prompt.startsWith(METHOD_SPECS.masculine.opening)).toBe(true);
     expect(JSON.stringify(invokeLLMMock.mock.calls[0]?.[0])).toContain("short black curly hair");
+    expect(result.prompt).toContain("Mandatory identity traits to preserve: Keep short black curly hair and a lean athletic build.");
+    expect(result.prompt).toContain("Mandatory hair traits to preserve: Keep short black curly hair and a lean athletic build.");
+    expect(result.prompt).toContain("Mandatory body and proportion traits to preserve: Keep short black curly hair and a lean athletic build.");
   });
 
   it("sends a selected image as multimodal content for the Feminine method", async () => {
@@ -59,11 +62,12 @@ describe("prompt.generate", () => {
   });
 
   it("extracts editable face traits independently of the scene image for either method", async () => {
-    invokeLLMMock.mockResolvedValue({ choices: [{ message: { content: "```json\n{\"traits\": \"Long wavy blonde hair, almond-shaped hazel eyes, an oval face, and pale skin.\"}\n```" } }] });
+    invokeLLMMock.mockResolvedValue({ choices: [{ message: { content: "```json\n{\"faceIdentity\": \"Almond-shaped hazel eyes, an oval face, and pale skin.\", \"hair\": \"Long wavy blonde hair.\", \"bodyPhysique\": \"\"}\n```" } }] });
     const caller = appRouter.createCaller(createContext());
     const result = await caller.prompt.extractTraits({ method: "masculine", faceReferenceDataUrl: "data:image/jpeg;base64,ZmFrZQ==" });
 
-    expect(result.traits).toContain("Long wavy blonde hair");
+    expect(result.traits).toContain("Hair: Long wavy blonde hair");
+    expect(result.traits).toContain("Face & identity: Almond-shaped hazel eyes");
     const request = invokeLLMMock.mock.calls[0]?.[0];
     expect(request.messages[1].content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "image_url" })]));
     expect(String(request.messages[0].content)).toContain("Do not identify the person");
@@ -72,12 +76,12 @@ describe("prompt.generate", () => {
   it("retries once when the first face-trait response is malformed", async () => {
     invokeLLMMock
       .mockResolvedValueOnce({ choices: [{ message: { content: "partial-face-json" } }] })
-      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ traits: "Short black curly hair, brown eyes, and an angular face." }) } }] });
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ faceIdentity: "Brown eyes and an angular face.", hair: "Short black curly hair.", bodyPhysique: "" }) } }] });
 
     const caller = appRouter.createCaller(createContext());
     const result = await caller.prompt.extractTraits({ method: "masculine", faceReferenceDataUrl: "data:image/jpeg;base64,ZmFrZQ==" });
 
-    expect(result.traits).toContain("Short black curly hair");
+    expect(result.traits).toContain("Hair: Short black curly hair");
     expect(invokeLLMMock).toHaveBeenCalledTimes(2);
   });
 
@@ -98,6 +102,8 @@ describe("prompt.generate", () => {
 
       expect(generated.prompt.startsWith(METHOD_SPECS[method].opening)).toBe(true);
       expect(generated.prompt).toContain(METHOD_SPECS[method].closing);
+      expect(generated.prompt).toContain(`Mandatory identity traits to preserve: ${traits}`);
+      expect(generated.prompt).toContain(`Mandatory hair traits to preserve: ${traits}`);
     }
 
     const [femaleFace, femaleScene, maleFace, maleScene] = invokeLLMMock.mock.calls.map(call => call[0]);

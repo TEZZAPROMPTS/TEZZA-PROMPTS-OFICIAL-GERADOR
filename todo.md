@@ -52,3 +52,8 @@
 - [x] Exibir no cliente as mensagens específicas de validação recebidas do tRPC para imagens grandes e entradas inválidas.
 - [x] Cobrir e validar as mensagens para imagem grande, resposta incompleta e indisponibilidade temporária da IA.
 - [x] Verificar por HTTP o conteúdo de uma mensagem de erro útil, além da estrutura JSON da resposta.
+- [x] Fazer o upload da foto de rosto preencher automaticamente o campo de traços pessoais editáveis.
+- [x] Garantir que os traços extraídos do rosto sejam incluídos de forma verificável nas seções de identidade, cabelo e corpo do prompt final.
+- [x] Validar o fluxo completo de rosto e cena para os métodos Feminino e Masculino sem perda de características.
+- [x] Mapear deterministicamente traços de cabelo para HAIR e traços corporais para BODY & PHYSIQUE no prompt final.
+- [x] Validar no navegador o fluxo completo do Método Masculino com rosto, cena e preservação dos traços extraídos.
