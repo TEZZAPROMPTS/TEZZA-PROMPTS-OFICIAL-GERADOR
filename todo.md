@@ -101,6 +101,6 @@
 - [ ] Configurar o repositório privado TEZZA-PROMPTS-OFICIAL como remoto do projeto.
 - [ ] Enviar a versão atual validada do Tezza Prompts ao GitHub.
 - [ ] Confirmar no GitHub que o código e o histórico inicial foram recebidos.
-- [ ] Configurar TEZZA-PROMPTS-OFICIAL-GERADOR como remoto autorizado do projeto.
-- [ ] Enviar a versão atual do Tezza Prompts ao repositório público novo.
-- [ ] Confirmar no GitHub os arquivos e o commit enviados ao novo repositório.
+- [x] Configurar TEZZA-PROMPTS-OFICIAL-GERADOR como remoto autorizado do projeto.
+- [x] Enviar a versão atual do Tezza Prompts ao repositório público novo.
+- [x] Confirmar no GitHub os arquivos e o commit enviados ao novo repositório.
