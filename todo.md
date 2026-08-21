@@ -23,3 +23,4 @@
 - [x] Validar que as aberturas e encerramentos dos métodos Feminino e Masculino não sejam misturados.
 - [x] Executar a validação de tipos, testes e revisão visual responsiva da atualização multi-método.
 - [x] Salvar uma versão validada da atualização com Método Feminino, Método Masculino e traços editáveis.
+- [x] Substituir o texto principal do hero pela nova mensagem de geração rápida de prompts.

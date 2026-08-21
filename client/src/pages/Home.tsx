@@ -90,7 +90,7 @@ export default function Home() {
         </header>
 
         <section className="pb-10 pt-12 text-center sm:pt-16">
-          <div className="mx-auto max-w-3xl"><p className="font-soft text-[10px] font-bold tracking-[0.26em] text-white/50">TEZZA PROMPTS OFICIAL · FLOW</p><h1 className="mt-4 font-display text-5xl leading-[0.92] tracking-[-0.055em] sm:text-6xl">Seu traço.<br /><em className="font-normal text-white/60">Seu prompt.</em></h1><p className="mx-auto mt-5 max-w-xl font-soft text-sm leading-6 text-white/58">Escolha o método, informe uma ideia ou foto e defina aquilo que deve permanecer fiel à pessoa.</p></div>
+          <div className="mx-auto max-w-3xl"><p className="font-soft text-[10px] font-bold tracking-[0.26em] text-white/50">TEZZA PROMPTS OFICIAL ·</p><h1 className="mt-4 font-display text-5xl leading-[0.92] tracking-[-0.055em] sm:text-6xl">Gere prompts<br /><em className="font-normal text-white/60">perfeitos em segundos.</em></h1><p className="mx-auto mt-5 max-w-xl font-soft text-sm leading-6 text-white/58">Escolha o método, descreva sua ideia ou envie uma foto e receba um prompt otimizado para criar imagens realistas e profissionais.</p></div>
         </section>
 
         <section className="tezza-card mx-auto max-w-6xl rounded-[2rem] p-5 sm:p-8 lg:p-10">
