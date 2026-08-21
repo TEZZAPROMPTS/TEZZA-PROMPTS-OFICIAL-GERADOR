@@ -37,7 +37,7 @@ describe("prompt.generate", () => {
   it("sends a selected image as multimodal content for the Feminine method", async () => {
     mockStructuredGeneration();
     const caller = appRouter.createCaller(createContext());
-    await caller.prompt.generate({ method: "feminine", mode: "photo", imageDataUrl: "data:image/png;base64,ZmFrZQ==" });
+    await caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageDataUrl: "data:image/png;base64,ZmFrZQ==" });
 
     const request = invokeLLMMock.mock.calls[0]?.[0];
     expect(request.messages[1].content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "image_url" })]));
@@ -54,8 +54,47 @@ describe("prompt.generate", () => {
     const caller = appRouter.createCaller(createContext());
     const oversizedImage = `data:image/jpeg;base64,${"a".repeat(950_000)}`;
 
-    await expect(caller.prompt.generate({ method: "feminine", mode: "photo", imageDataUrl: oversizedImage })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageDataUrl: oversizedImage })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(invokeLLMMock).not.toHaveBeenCalled();
+  });
+
+  it("extracts editable face traits independently of the scene image for either method", async () => {
+    invokeLLMMock.mockResolvedValue({ choices: [{ message: { content: "```json\n{\"traits\": \"Long wavy blonde hair, almond-shaped hazel eyes, an oval face, and pale skin.\"}\n```" } }] });
+    const caller = appRouter.createCaller(createContext());
+    const result = await caller.prompt.extractTraits({ method: "masculine", faceReferenceDataUrl: "data:image/jpeg;base64,ZmFrZQ==" });
+
+    expect(result.traits).toContain("Long wavy blonde hair");
+    const request = invokeLLMMock.mock.calls[0]?.[0];
+    expect(request.messages[1].content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "image_url" })]));
+    expect(String(request.messages[0].content)).toContain("Do not identify the person");
+  });
+
+  it("keeps the face source and scene source independent from extraction through photo generation for both methods", async () => {
+    const caller = appRouter.createCaller(createContext());
+    const sections = Object.fromEntries(SECTION_DEFINITIONS.map(({ key }) => [key, `Scene-directed content for ${key}.`]));
+
+    for (const [method, traits] of [
+      ["feminine", "Oval face, long wavy blonde hair, and hazel eyes."],
+      ["masculine", "Angular face, short black curls, brown eyes, and a trimmed beard."],
+    ] as const) {
+      invokeLLMMock
+        .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ traits }) } }] })
+        .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(sections) } }] });
+
+      const extracted = await caller.prompt.extractTraits({ method, faceReferenceDataUrl: "data:image/jpeg;base64,ZmFjZQ==" });
+      const generated = await caller.prompt.generate({ method, mode: "photo", personalTraits: extracted.traits, sceneImageDataUrl: "data:image/jpeg;base64,c2NlbmU=" });
+
+      expect(generated.prompt.startsWith(METHOD_SPECS[method].opening)).toBe(true);
+      expect(generated.prompt).toContain(METHOD_SPECS[method].closing);
+    }
+
+    const [femaleFace, femaleScene, maleFace, maleScene] = invokeLLMMock.mock.calls.map(call => call[0]);
+    expect(JSON.stringify(femaleFace.messages[1].content)).toContain("ZmFjZQ==");
+    expect(JSON.stringify(femaleScene.messages[1].content)).toContain("c2NlbmU=");
+    expect(String(femaleScene.messages[0].content)).toContain("long wavy blonde hair");
+    expect(JSON.stringify(maleFace.messages[1].content)).toContain("ZmFjZQ==");
+    expect(JSON.stringify(maleScene.messages[1].content)).toContain("c2NlbmU=");
+    expect(String(maleScene.messages[0].content)).toContain("short black curls");
   });
 
   it("returns a controlled server error when generation fails", async () => {

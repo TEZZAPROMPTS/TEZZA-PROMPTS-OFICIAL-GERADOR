@@ -34,3 +34,12 @@
 - [x] Garantir que os traços editáveis do Masculino sejam prioridade e não exibam marcadores internos, setas ou referência a imagem no resultado.
 - [x] Aumentar o destaque de “TEZZA PROMPTS OFICIAL” no hero e remover os rótulos “MÉTODO 01” e “TEXTO / FOTO” do cabeçalho.
 - [x] Testar que ambos os métodos seguem suas respectivas bases sem mistura de regras.
+- [x] Adicionar a extração de traços visuais por foto para preencher o campo editável de traços pessoais.
+- [x] Garantir que a extração descreva somente atributos visuais aparentes e que o usuário possa editar antes de gerar.
+- [x] Validar a extração de traços por foto e a integração com os métodos Feminino e Masculino.
+- [x] Adicionar uma imagem de rosto independente para extrair somente traços pessoais editáveis.
+- [x] Manter uma segunda imagem de cena independente para descrever pose, roupa, ambiente e composição do prompt.
+- [x] Combinar os traços do rosto com a cena sem confundir as duas fontes nos métodos Feminino e Masculino.
+- [x] Executar e registrar validação fim a fim da extração de traços com geração por cena no Método Feminino.
+- [x] Executar e registrar validação fim a fim da extração de traços com geração por cena no Método Masculino.
+- [x] Adicionar teste de endpoint do fluxo combinado, garantindo fontes visuais independentes.

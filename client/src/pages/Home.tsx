@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
-import { ArrowUpRight, Check, Copy, History, ImageIcon, LoaderCircle, RotateCcw, Sparkles, Type, Upload, X } from "lucide-react";
+import { ArrowUpRight, Check, Copy, History, ImageIcon, LoaderCircle, RotateCcw, ScanFace, Sparkles, Type, Upload, X } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -58,13 +58,17 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("text");
   const [direction, setDirection] = useState("");
   const [personalTraits, setPersonalTraits] = useState("");
-  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
-  const [imageName, setImageName] = useState("");
-  const [imageError, setImageError] = useState("");
+  const [sceneImageDataUrl, setSceneImageDataUrl] = useState<string | null>(null);
+  const [sceneImageName, setSceneImageName] = useState("");
+  const [sceneError, setSceneError] = useState("");
+  const [faceReferenceDataUrl, setFaceReferenceDataUrl] = useState<string | null>(null);
+  const [faceReferenceName, setFaceReferenceName] = useState("");
+  const [faceError, setFaceError] = useState("");
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [history, setHistory] = useState<PromptHistoryEntry[]>([]);
   const [copied, setCopied] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const sceneFileInputRef = useRef<HTMLInputElement>(null);
+  const faceFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
@@ -76,7 +80,7 @@ export default function Home() {
   const generateMutation = trpc.prompt.generate.useMutation({
     onSuccess: data => {
       setGeneratedPrompt(data.prompt);
-      const entry = makeEntry(data.prompt, mode, method, mode === "text" ? direction : imageName);
+      const entry = makeEntry(data.prompt, mode, method, mode === "text" ? direction : sceneImageName);
       setHistory(current => {
         const next = [entry, ...current].slice(0, 12);
         window.sessionStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(next));
@@ -87,29 +91,58 @@ export default function Home() {
     onError: error => toast.error(error.message || "Não foi possível gerar o prompt agora."),
   });
 
+  const extractTraitsMutation = trpc.prompt.extractTraits.useMutation({
+    onSuccess: data => {
+      setPersonalTraits(data.traits);
+      toast.success("Traços visuais preenchidos. Você pode editar antes de gerar.");
+    },
+    onError: error => toast.error(error.message || "Não foi possível extrair os traços agora."),
+  });
+
   const modeDescription = useMemo(() => mode === "text" ? "Descreva o conceito, o cenário e a direção visual. O motor organiza tudo no esqueleto fixo escolhido." : "Envie a imagem. A IA preserva os elementos visuais observáveis e aplica as regras do método selecionado.", [mode]);
 
-  async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleScenePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    setImageError("");
+    setSceneError("");
     if (!file) return;
-    if (!file.type.startsWith("image/")) return setImageError("Escolha uma imagem em JPG, PNG ou WEBP.");
-    if (file.size > MAX_UPLOAD_FILE_SIZE) return setImageError("A imagem deve ter até 8 MB.");
+    if (!file.type.startsWith("image/")) return setSceneError("Escolha uma imagem em JPG, PNG ou WEBP.");
+    if (file.size > MAX_UPLOAD_FILE_SIZE) return setSceneError("A imagem deve ter até 8 MB.");
     try {
       const optimizedImage = await compressImageForGeneration(file);
-      setImageDataUrl(optimizedImage);
-      setImageName(file.name.replace(/\.[^.]+$/, ""));
+      setSceneImageDataUrl(optimizedImage);
+      setSceneImageName(file.name.replace(/\.[^.]+$/, ""));
     } catch (error) {
-      setImageDataUrl(null);
-      setImageError(error instanceof Error ? error.message : "Não foi possível preparar esta imagem.");
+      setSceneImageDataUrl(null);
+      setSceneError(error instanceof Error ? error.message : "Não foi possível preparar esta imagem.");
     }
   }
 
-  function clearImage() { setImageDataUrl(null); setImageName(""); setImageError(""); if (fileInputRef.current) fileInputRef.current.value = ""; }
+  async function handleFaceReferenceChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    setFaceError("");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return setFaceError("Escolha uma imagem em JPG, PNG ou WEBP.");
+    if (file.size > MAX_UPLOAD_FILE_SIZE) return setFaceError("A imagem deve ter até 8 MB.");
+    try {
+      const optimizedImage = await compressImageForGeneration(file);
+      setFaceReferenceDataUrl(optimizedImage);
+      setFaceReferenceName(file.name.replace(/\.[^.]+$/, ""));
+    } catch (error) {
+      setFaceReferenceDataUrl(null);
+      setFaceError(error instanceof Error ? error.message : "Não foi possível preparar esta imagem.");
+    }
+  }
+
+  function clearSceneImage() { setSceneImageDataUrl(null); setSceneImageName(""); setSceneError(""); if (sceneFileInputRef.current) sceneFileInputRef.current.value = ""; }
+  function clearFaceReference() { setFaceReferenceDataUrl(null); setFaceReferenceName(""); setFaceError(""); if (faceFileInputRef.current) faceFileInputRef.current.value = ""; }
+  function extractFaceTraits() {
+    if (!faceReferenceDataUrl) return setFaceError("Envie uma foto de rosto para extrair os traços.");
+    extractTraitsMutation.mutate({ method, faceReferenceDataUrl });
+  }
   function generatePrompt() {
     if (mode === "text") return generateMutation.mutate({ method, mode, userText: direction, personalTraits });
-    if (!imageDataUrl) return setImageError("Envie uma imagem para gerar pelo modo Foto.");
-    generateMutation.mutate({ method, mode, imageDataUrl, personalTraits });
+    if (!sceneImageDataUrl) return setSceneError("Envie uma imagem de cena para gerar pelo modo Foto.");
+    generateMutation.mutate({ method, mode, sceneImageDataUrl, personalTraits });
   }
   async function copyPrompt(prompt = generatedPrompt) {
     if (!prompt) return;
@@ -141,9 +174,28 @@ export default function Home() {
             <div className="panel rounded-[1.65rem] p-5 sm:p-6">
               <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-start"><div><p className="font-soft text-[10px] font-bold tracking-[0.2em] text-white/46">DIREÇÃO DE ENTRADA</p><h3 className="mt-1 font-display text-3xl tracking-[-0.04em]">{METHOD_COPY[method].label}</h3></div><div className="mode-switch"><button onClick={() => setMode("text")} className={cn(mode === "text" && "active")}><Type className="h-3.5 w-3.5" /> Texto</button><button onClick={() => setMode("photo")} className={cn(mode === "photo" && "active")}><ImageIcon className="h-3.5 w-3.5" /> Foto</button></div></div>
               <p className="mt-5 font-soft text-sm leading-6 text-white/57">{modeDescription}</p>
-              {mode === "text" ? <div className="mt-6"><label htmlFor="creative-direction" className="field-label">DIREÇÃO CRIATIVA</label><textarea id="creative-direction" value={direction} onChange={event => setDirection(event.target.value)} placeholder={METHOD_COPY[method].input} className="mono-input min-h-[164px]" /><p className="mt-2 text-right font-soft text-[10px] text-white/35">{direction.length} / 2400</p></div> : <div className="mt-6"><input ref={fileInputRef} onChange={handlePhotoChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="photo-upload" type="file" />{imageDataUrl ? <div className="relative overflow-hidden rounded-3xl border border-white/15"><img src={imageDataUrl} alt="Prévia da imagem selecionada" className="h-[210px] w-full object-cover opacity-85" /><div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-4 pt-12"><p className="min-w-0 truncate font-soft text-xs">{imageName}</p><button onClick={clearImage} className="grid h-8 w-8 place-items-center rounded-full border border-white/35 bg-black/80 text-white"><X className="h-4 w-4" /></button></div></div> : <label htmlFor="photo-upload" className="upload-box"><Upload className="h-5 w-5" /><p>Enviar imagem de referência</p><small>JPG, PNG ou WEBP · até 8 MB · otimizada antes de enviar</small></label>}{imageError && <p className="mt-3 font-soft text-xs text-white/72">{imageError}</p>}</div>}
-              <div className="mt-6"><label htmlFor="personal-traits" className="field-label">TRAÇOS E RESTRIÇÕES OBRIGATÓRIAS <span>EDITÁVEL</span></label><textarea id="personal-traits" value={personalTraits} onChange={event => setPersonalTraits(event.target.value)} placeholder="Ex.: manter cabelo loiro; liso, com caimento fluido; rosto oval; olhos castanhos; preservar proporções e identidade visual; não incluir tatuagens..." className="mono-input min-h-[138px]" /><p className="mt-2 font-soft text-[11px] leading-5 text-white/42">Esses traços têm prioridade e entram no prompt final de forma natural, sem mostrar “INSIRA AQUI”.</p></div>
-              <Button onClick={generatePrompt} disabled={generateMutation.isPending || (mode === "text" ? direction.trim().length < 8 : !imageDataUrl)} className="tezza-button mt-7 h-12 w-full rounded-full font-soft text-sm font-bold text-black"><>{generateMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Estruturando...</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar {METHOD_COPY[method].label} <ArrowUpRight className="ml-1 h-4 w-4" /></>}</></Button>
+              {mode === "text" ? (
+                <div className="mt-6"><label htmlFor="creative-direction" className="field-label">DIREÇÃO CRIATIVA</label><textarea id="creative-direction" value={direction} onChange={event => setDirection(event.target.value)} placeholder={METHOD_COPY[method].input} className="mono-input min-h-[164px]" /><p className="mt-2 text-right font-soft text-[10px] text-white/35">{direction.length} / 2400</p></div>
+              ) : (
+                <div className="mt-6">
+                  <label className="field-label">IMAGEM DA CENA <span>POSE, ROUPA E AMBIENTE</span></label>
+                  <input ref={sceneFileInputRef} onChange={handleScenePhotoChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="scene-upload" type="file" />
+                  {sceneImageDataUrl ? (
+                    <div className="relative overflow-hidden rounded-3xl border border-white/15"><img src={sceneImageDataUrl} alt="Prévia da cena selecionada" className="h-[210px] w-full object-cover opacity-85" /><div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-4 pt-12"><p className="min-w-0 truncate font-soft text-xs">{sceneImageName}</p><button onClick={clearSceneImage} className="grid h-8 w-8 place-items-center rounded-full border border-white/35 bg-black/80 text-white" aria-label="Remover imagem de cena"><X className="h-4 w-4" /></button></div></div>
+                  ) : <label htmlFor="scene-upload" className="upload-box"><ImageIcon className="h-5 w-5" /><p>Enviar imagem da cena</p><small>Pose, roupa, ambiente e composição · até 8 MB</small></label>}
+                  {sceneError && <p className="mt-3 font-soft text-xs text-white/72">{sceneError}</p>}
+                </div>
+              )}
+              <div className="mt-6 rounded-2xl border border-white/12 bg-white/[0.025] p-4">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="field-label mb-1">ROSTO DE REFERÊNCIA <span>OPCIONAL</span></p><p className="font-soft text-[11px] leading-5 text-white/45">Usado somente para preencher os traços pessoais. A cena continua sendo uma imagem separada.</p></div><button type="button" onClick={extractFaceTraits} disabled={!faceReferenceDataUrl || extractTraitsMutation.isPending} className="copy-button shrink-0 disabled:opacity-40">{extractTraitsMutation.isPending ? <><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Extraindo...</> : <><ScanFace className="h-3.5 w-3.5" /> Extrair traços</>}</button></div>
+                <input ref={faceFileInputRef} onChange={handleFaceReferenceChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="face-reference-upload" type="file" />
+                {faceReferenceDataUrl ? (
+                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-2"><img src={faceReferenceDataUrl} alt="Prévia do rosto de referência" className="h-14 w-14 rounded-lg object-cover" /><p className="min-w-0 flex-1 truncate font-soft text-xs text-white/72">{faceReferenceName}</p><button onClick={clearFaceReference} className="grid h-8 w-8 place-items-center rounded-full border border-white/20 text-white/75" aria-label="Remover rosto de referência"><X className="h-4 w-4" /></button></div>
+                ) : <label htmlFor="face-reference-upload" className="mt-4 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-white/20 px-4 py-3 font-soft text-xs text-white/58 transition hover:border-white/50 hover:text-white"><ScanFace className="h-4 w-4" /> Enviar foto do rosto para extrair traços</label>}
+                {faceError && <p className="mt-3 font-soft text-xs text-white/72">{faceError}</p>}
+              </div>
+              <div className="mt-6"><label htmlFor="personal-traits" className="field-label">TRAÇOS E RESTRIÇÕES OBRIGATÓRIAS <span>EDITÁVEL</span></label><textarea id="personal-traits" value={personalTraits} onChange={event => setPersonalTraits(event.target.value)} placeholder="Ex.: manter cabelo loiro; liso, com caimento fluido; rosto oval; olhos castanhos; preservar proporções e identidade visual; não incluir tatuagens..." className="mono-input min-h-[138px]" /><p className="mt-2 font-soft text-[11px] leading-5 text-white/42">A foto de rosto pode preencher estes traços automaticamente. Revise ou edite antes de gerar.</p></div>
+              <Button onClick={generatePrompt} disabled={generateMutation.isPending || (mode === "text" ? direction.trim().length < 8 : !sceneImageDataUrl)} className="tezza-button mt-7 h-12 w-full rounded-full font-soft text-sm font-bold text-black"><>{generateMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Estruturando...</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar {METHOD_COPY[method].label} <ArrowUpRight className="ml-1 h-4 w-4" /></>}</></Button>
               <p className="mt-3 text-center font-soft text-[9px] font-bold tracking-[0.13em] text-white/39">INGLÊS · ESTRUTURA FIXA · TEXTO COPIÁVEL</p>
             </div>
 

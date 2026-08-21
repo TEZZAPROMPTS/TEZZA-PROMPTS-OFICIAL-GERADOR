@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { generateMethodPrompt } from "./promptEngine";
+import { extractFaceTraits, generateMethodPrompt } from "./promptEngine";
 import { publicProcedure, router } from "./_core/trpc";
 
 export const appRouter = router({
@@ -17,6 +17,22 @@ export const appRouter = router({
     }),
   }),
   prompt: router({
+    extractTraits: publicProcedure
+      .input(
+        z.object({
+          method: z.enum(["feminine", "masculine"]),
+          faceReferenceDataUrl: z.string().max(950_000, "The face image is still too large. Please choose a smaller image.").refine(value => value.startsWith("data:image/"), "Choose a valid face image."),
+        })
+      )
+      .mutation(async ({ input }) => {
+        try {
+          const traits = await extractFaceTraits(input);
+          return { traits };
+        } catch (error) {
+          console.error("[Tezza Prompts] Face trait extraction failed", error);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "We could not extract the face traits just now. Please try again." });
+        }
+      }),
     generate: publicProcedure
       .input(
         z
@@ -25,11 +41,11 @@ export const appRouter = router({
             mode: z.enum(["text", "photo"]),
             userText: z.string().trim().min(8).max(2400).optional(),
             personalTraits: z.string().trim().max(1800).optional(),
-            imageDataUrl: z.string().max(950_000, "The image is still too large. Please choose a smaller image.").optional(),
+            sceneImageDataUrl: z.string().max(950_000, "The scene image is still too large. Please choose a smaller image.").optional(),
           })
           .superRefine((value, ctx) => {
             if (value.mode === "text" && !value.userText) ctx.addIssue({ code: "custom", message: "Write a little more about the desired prompt." });
-            if (value.mode === "photo" && !value.imageDataUrl?.startsWith("data:image/")) ctx.addIssue({ code: "custom", message: "Choose a valid image to analyse." });
+            if (value.mode === "photo" && !value.sceneImageDataUrl?.startsWith("data:image/")) ctx.addIssue({ code: "custom", message: "Choose a valid scene image to analyse." });
           })
       )
       .mutation(async ({ input }) => {

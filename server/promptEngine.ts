@@ -91,6 +91,16 @@ export function normalizeSections(candidate: Partial<PromptSections>): PromptSec
   ) as PromptSections;
 }
 
+function parseStructuredJson(content: string): unknown {
+  const withoutCodeFence = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  const firstBrace = withoutCodeFence.indexOf("{");
+  const lastBrace = withoutCodeFence.lastIndexOf("}");
+  const json = firstBrace >= 0 && lastBrace >= firstBrace
+    ? withoutCodeFence.slice(firstBrace, lastBrace + 1)
+    : withoutCodeFence;
+  return JSON.parse(json);
+}
+
 export function renderMethodPrompt(method: PromptMethod, sections: PromptSections) {
   const body = SECTION_DEFINITIONS.map(({ key, heading }) => `${heading}\n${sections[key]}`).join("\n\n");
   const spec = METHOD_SPECS[method];
@@ -106,7 +116,7 @@ export function buildGenerationMessages(input: {
   mode: GeneratorMode;
   userText?: string;
   personalTraits?: string;
-  imageDataUrl?: string;
+  sceneImageDataUrl?: string;
 }) {
   const method = input.method ?? "feminine";
   const spec = METHOD_SPECS[method];
@@ -127,14 +137,14 @@ ${priorityTraits}
 
 Rules without exception: never mention an image, photo, picture, reference, upload, source, analysis, the personal-traits label, or any “insert here” marker; never use arrows; never include Markdown or headings in a value; never describe tattoos; never refer to minors; never output an instruction, disclaimer, explanation, or code fence. Keep each value specific to its section, coherent, non-explicit, and suitable for a luxury editorial CGI rendering prompt.`;
 
-  if (input.mode === "photo" && input.imageDataUrl) {
+  if (input.mode === "photo" && input.sceneImageDataUrl) {
     return [
       { role: "system" as const, content: system },
       {
         role: "user" as const,
         content: [
-          { type: "text" as const, text: "Extract the visible visual direction with maximum fidelity and fill every prompt section. Do not add elements that are not visibly supported, except the explicit non-negotiable personal traits supplied above." },
-          { type: "image_url" as const, image_url: { url: input.imageDataUrl, detail: "high" as const } },
+          { type: "text" as const, text: "This is the scene reference only. Extract its visible pose, body positioning, head angle, facial expression, framing, camera angle, composition, outfit, accessories, lighting, environment, mood, and render direction with maximum fidelity. Do not use it as the source of facial identity traits, because those traits are supplied separately above. Do not add elements that are not visibly supported, except the explicit non-negotiable personal traits supplied above." },
+          { type: "image_url" as const, image_url: { url: input.sceneImageDataUrl, detail: "high" as const } },
         ],
       },
     ];
@@ -151,7 +161,7 @@ export async function generateMethodPrompt(input: {
   mode: GeneratorMode;
   userText?: string;
   personalTraits?: string;
-  imageDataUrl?: string;
+  sceneImageDataUrl?: string;
 }) {
   const method = input.method ?? "feminine";
   const response = await invokeLLM({
@@ -177,10 +187,61 @@ export async function generateMethodPrompt(input: {
   if (typeof content !== "string") throw new Error("The generation service returned an empty response.");
 
   try {
-    const parsed = JSON.parse(content) as Partial<PromptSections>;
+    const parsed = parseStructuredJson(content) as Partial<PromptSections>;
     return renderMethodPrompt(method, normalizeSections(parsed));
   } catch {
     throw new Error("The generation service returned an invalid structured response.");
+  }
+}
+
+export function buildFaceTraitMessages(input: { method: PromptMethod; faceReferenceDataUrl: string }) {
+  const method = input.method;
+  const role = method === "feminine" ? "an adult feminine avatar" : "an adult masculine avatar";
+  return [
+    {
+      role: "system" as const,
+      content: `You extract only visible, non-sensitive appearance traits from a face reference for ${role}. Return only a strict JSON object with one English string field named "traits". Describe visible facial structure, apparent skin tone, eye appearance, eyebrow appearance, hair colour, hair type, hair texture, hair fall or movement, facial hair when visibly present, and apparent facial proportions. Keep the description factual, concise, editable, and suitable for a fictional CGI avatar prompt. Do not identify the person, guess their name, age, ancestry, ethnicity, nationality, religion, health, personality, attractiveness, or any non-visible trait. Do not mention the photo, image, reference, analysis, tattoos, or any instruction. Do not use arrows or Markdown.`,
+    },
+    {
+      role: "user" as const,
+      content: [
+        { type: "text" as const, text: "Extract editable visual face traits only. The traits will be combined later with a separate scene image." },
+        { type: "image_url" as const, image_url: { url: input.faceReferenceDataUrl, detail: "high" as const } },
+      ],
+    },
+  ];
+}
+
+export async function extractFaceTraits(input: { method: PromptMethod; faceReferenceDataUrl: string }) {
+  const response = await invokeLLM({
+    model: "gemini-3-flash-preview",
+    messages: buildFaceTraitMessages(input),
+    maxTokens: 700,
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "tezza_face_traits",
+        strict: true,
+        schema: {
+          type: "object",
+          properties: { traits: { type: "string", description: "Editable English visual face traits." } },
+          required: ["traits"],
+          additionalProperties: false,
+        },
+      },
+    },
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (typeof content !== "string") throw new Error("The trait extraction service returned an empty response.");
+  try {
+    const parsed = parseStructuredJson(content) as { traits?: unknown };
+    const traits = cleanSection(parsed.traits);
+    if (traits === EMPTY_SECTION_FALLBACK) throw new Error("The trait extraction service returned no usable traits.");
+    return traits;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("no usable traits")) throw error;
+    throw new Error("The trait extraction service returned an invalid structured response.");
   }
 }
 
