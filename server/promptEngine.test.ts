@@ -32,24 +32,32 @@ describe("Tezza prompt methods", () => {
     }
   });
 
-  it("preserves the authorized openings and closings literally while preventing their duplication in STYLE & RENDER QUALITY", () => {
+  it("preserves variable STYLE & RENDER QUALITY content while keeping the authorized closing only at the end", () => {
+    const feminineStyle = "The scene is rendered with soft-focus depth and rich material textures, emphasizing the interplay between silk fabrics and warm interior light.";
+    const masculineStyle = "The scene is rendered with crisp directional depth and rich material textures, emphasizing tailored fabrics and atmospheric interior light.";
     const feminine = renderMethodPrompt("feminine", {
       ...completeSections,
-      styleRenderQuality: "Polished virtual-influencer beauty rendered with Blender Cycles and Seedream 5.0 for cinematic material realism and depth.",
+      styleRenderQuality: feminineStyle,
     });
     const masculine = renderMethodPrompt("masculine", {
       ...completeSections,
-      styleRenderQuality: "Polished virtual-influencer styling rendered with Blender Cycles and high-fidelity masculine CGI rendering for cinematic material realism and depth.",
+      styleRenderQuality: masculineStyle,
+    });
+    const feminineWithRepeatedClosing = renderMethodPrompt("feminine", {
+      ...completeSections,
+      styleRenderQuality: `${feminineStyle} ${METHOD_SPECS.feminine.closing}`,
     });
 
     expect(METHOD_SPECS.feminine.opening).toBe("Ultra-realistic cinematic avatar 3D female portrait, Blender Cycles render in CGI, inspired by Seedream 5.0 beauty realism and high-end IMVU/The Sims virtual aesthetics. Clearly a fictional digital avatar and not a real photograph. Hyper-detailed virtual influencer design with stylized CGI beauty proportions, luxury editorial aesthetics, advanced cinematic lighting, ultra-polished 3D rendering, and “TEZZA PROMPTS” text at the bottom center in elegant minimalist typography.");
     expect(METHOD_SPECS.feminine.closing).toBe("Ultra-photorealistic Blender Cycles CGI render, cinematic realism, Seedream 5.0 beauty rendering, 8K UHD quality, physically accurate lighting and materials, realistic skin micro-detail, IMVU-inspired beauty repaint style, high-fidelity feminine avatar rendering, realistic depth of field, glossy beauty aesthetic, polished virtual influencer atmosphere, advanced ray tracing, realistic reflections, luxury editorial lighting, ultra-clean cinematic render quality, and clearly fictional CGI avatar aesthetics instead of a real photograph.");
     expect(METHOD_SPECS.masculine.opening).toBe("Ultra-realistic cinematic avatar 3D male portrait, Blender Cycles render in CGI, inspired by Seedream 5.0 realism and high-end IMVU/The Sims virtual aesthetics. Clearly a fictional digital avatar and not a real photograph. Hyper-detailed virtual influencer design with stylized CGI masculine proportions, luxury editorial aesthetics, advanced cinematic lighting, ultra-polished 3D rendering, and “TEZZA PROMPTS” text at the bottom center in elegant minimalist typography.");
     expect(METHOD_SPECS.masculine.closing).toBe("Ultra-photorealistic Blender Cycles CGI render, cinematic realism, Seedream 5.0 masculine beauty rendering, 8K UHD quality, physically accurate lighting and materials, realistic skin micro-detail, IMVU-inspired avatar repaint aesthetics, high-fidelity masculine CGI rendering, realistic atmospheric depth, polished virtual influencer styling, advanced ray tracing, realistic reflections, luxury editorial lighting, ultra-clean cinematic render quality, and clearly fictional CGI-avatar aesthetics instead of a real photograph.");
-    expect(feminine).toContain("STYLE & RENDER QUALITY\nPolished virtual-influencer beauty with cohesive cinematic material realism, balanced depth, and a refined luxury editorial finish.");
-    expect(masculine).toContain("STYLE & RENDER QUALITY\nPolished virtual-influencer styling with cohesive cinematic material realism, balanced atmosphere, and a refined luxury editorial finish.");
+    expect(feminine).toContain(`STYLE & RENDER QUALITY\n${feminineStyle}\n\n${METHOD_SPECS.feminine.closing}`);
+    expect(masculine).toContain(`STYLE & RENDER QUALITY\n${masculineStyle}\n\n${METHOD_SPECS.masculine.closing}`);
     expect(feminine.split(METHOD_SPECS.feminine.closing)).toHaveLength(2);
     expect(masculine.split(METHOD_SPECS.masculine.closing)).toHaveLength(2);
+    expect(feminineWithRepeatedClosing).toContain(`STYLE & RENDER QUALITY\n${feminineStyle}\n\n${METHOD_SPECS.feminine.closing}`);
+    expect(feminineWithRepeatedClosing.split(METHOD_SPECS.feminine.closing)).toHaveLength(2);
   });
 
   it("passes personal traits as priority direction without exposing markers in rendered sections", () => {
@@ -81,7 +89,7 @@ describe("Tezza prompt methods", () => {
     expect(masculineSystem).toContain("never default to the example man's black curls");
     expect(feminineSystem).toContain("Populate exactly these sections");
     expect(masculineSystem).toContain("14 immutable section headings");
-    expect(feminineSystem).toContain("For both methods, STYLE & RENDER QUALITY must describe only the scene's visual treatment");
-    expect(masculineSystem).toContain("high-fidelity masculine CGI rendering");
+    expect(feminineSystem).toContain("For both methods, STYLE & RENDER QUALITY must describe only the visual treatment of the requested scene.");
+    expect(masculineSystem).toContain("Do not output, repeat, or paraphrase the immutable opening or immutable closing there");
   });
 });

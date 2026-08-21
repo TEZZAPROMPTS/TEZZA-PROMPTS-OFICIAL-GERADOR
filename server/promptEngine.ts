@@ -60,21 +60,6 @@ export const METHOD_ONE_CLOSING = METHOD_SPECS.feminine.closing;
 const EMPTY_SECTION_FALLBACK =
   "Render this element with cohesive, high-end virtual editorial detail that remains faithful to the provided direction.";
 
-const STYLE_SECTION_FALLBACKS: Record<PromptMethod, string> = {
-  feminine: "Polished virtual-influencer beauty with cohesive cinematic material realism, balanced depth, and a refined luxury editorial finish.",
-  masculine: "Polished virtual-influencer styling with cohesive cinematic material realism, balanced atmosphere, and a refined luxury editorial finish.",
-};
-
-const FIXED_RENDER_LANGUAGE = [
-  /blender\s+cycles/i,
-  /seedream\s*5(?:\.0)?/i,
-  /imvu/i,
-  /8k\s+uhd/i,
-  /high-fidelity\s+(?:feminine\s+avatar|masculine\s+cgi)\s+rendering/i,
-  /advanced\s+ray\s+tracing/i,
-  /fictional\s+cgi-?\s*avatar/i,
-];
-
 const JSON_PROPERTIES = Object.fromEntries(
   SECTION_DEFINITIONS.map(({ key, heading }) => [
     key,
@@ -157,17 +142,17 @@ function applyMandatoryIdentityTraits(sections: PromptSections, personalTraits?:
   };
 }
 
-function preventClosingDuplication(method: PromptMethod, value: string) {
+function preventLiteralClosingDuplication(method: PromptMethod, value: string) {
   const cleaned = cleanSection(value);
-  return FIXED_RENDER_LANGUAGE.some(pattern => pattern.test(cleaned))
-    ? STYLE_SECTION_FALLBACKS[method]
-    : cleaned;
+  const escapedClosing = METHOD_SPECS[method].closing.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const withoutClosing = cleaned.replace(new RegExp(escapedClosing, "gi"), "").trim();
+  return withoutClosing || EMPTY_SECTION_FALLBACK;
 }
 
 export function renderMethodPrompt(method: PromptMethod, sections: PromptSections, personalTraits?: string) {
   const preparedSections = {
     ...sections,
-    styleRenderQuality: preventClosingDuplication(method, sections.styleRenderQuality),
+    styleRenderQuality: preventLiteralClosingDuplication(method, sections.styleRenderQuality),
   };
   const lockedSections = applyMandatoryIdentityTraits(preparedSections, personalTraits);
   const body = SECTION_DEFINITIONS.map(({ key, heading }) => `${heading}\n${lockedSections[key]}`).join("\n\n");
@@ -203,7 +188,7 @@ PRESERVATION PRIORITY: Preserve all user-supplied facts. In photo mode, the visi
 
 ${priorityTraits}
 
-Rules without exception: never mention an image, photo, picture, reference, upload, source, analysis, the personal-traits label, or any “insert here” marker; never use arrows; never include Markdown or headings in a value; never describe tattoos; never refer to minors; never output an instruction, disclaimer, explanation, or code fence. Keep each value specific to its section, coherent, non-explicit, and suitable for a luxury editorial CGI rendering prompt. Write one concise sentence per section and keep every section under 55 words so the complete JSON response is never truncated. For both methods, STYLE & RENDER QUALITY must describe only the scene's visual treatment and must not repeat or paraphrase the immutable closing; never use Blender Cycles, Seedream, IMVU, 8K, ray tracing, high-fidelity feminine avatar rendering, high-fidelity masculine CGI rendering, or fictional CGI-avatar language there because the final renderer adds that fixed closing separately.`;
+Rules without exception: never mention an image, photo, picture, reference, upload, source, analysis, the personal-traits label, or any “insert here” marker; never use arrows; never include Markdown or headings in a value; never describe tattoos; never refer to minors; never output an instruction, disclaimer, explanation, or code fence. Keep each value specific to its section, coherent, non-explicit, and suitable for a luxury editorial CGI rendering prompt. Write one concise sentence per section and keep every section under 55 words so the complete JSON response is never truncated. For both methods, STYLE & RENDER QUALITY must describe only the visual treatment of the requested scene. Do not output, repeat, or paraphrase the immutable opening or immutable closing there: the final renderer adds those fixed blocks separately.`;
 
   if (input.mode === "photo" && input.sceneImageUrl) {
     return [

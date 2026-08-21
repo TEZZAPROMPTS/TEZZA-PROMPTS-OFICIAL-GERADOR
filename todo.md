@@ -85,3 +85,6 @@
 - [x] Garantir por teste que os fechamentos dos dois métodos permaneçam idênticos às bases autorizadas.
 - [x] Validar que o encerramento feminino permanece exatamente igual à base autorizada da usuária.
 - [x] Remover a repetição de termos fixos do encerramento feminino apenas da seção STYLE & RENDER QUALITY.
+- [x] Restaurar STYLE & RENDER QUALITY como descrição variável da cena, conforme a base anexada.
+- [x] Garantir que o encerramento completo autorizado apareça somente após STYLE & RENDER QUALITY, uma única vez.
+- [x] Impedir duplicações do fechamento sem substituir o conteúdo variável válido da seção de estilo.
