@@ -60,6 +60,20 @@ export const METHOD_ONE_CLOSING = METHOD_SPECS.feminine.closing;
 const EMPTY_SECTION_FALLBACK =
   "Render this element with cohesive, high-end virtual editorial detail that remains faithful to the provided direction.";
 
+const STYLE_SECTION_FALLBACK =
+  "The scene is rendered with cohesive material textures, depth, and visual treatment that reflect the requested direction.";
+
+const FIXED_CLOSING_STYLE_LANGUAGE = [
+  /\bhigh-fidelity\b/gi,
+  /\bblender\s+cycles(?:\s+(?:cgi\s+)?render(?:ing)?)?\b/gi,
+  /\bseedream\s*5(?:\.0)?(?:\s+(?:(?:masculine\s+)?beauty\s+(?:shaders?|rendering)))?\b/gi,
+  /\b(?:cinematic\s+)?virtual-?avatar\s+aesthetics?\b/gi,
+  /\bimvu-inspired(?:\s+avatar)?(?:\s+repaint)?\s+aesthetics?\b/gi,
+  /\badvanced\s+ray\s+tracing\b/gi,
+  /\b8k\s+uhd(?:\s+quality)?\b/gi,
+  /\bpolished\s+virtual\s+influencer\s+(?:atmosphere|styling)\b/gi,
+];
+
 const JSON_PROPERTIES = Object.fromEntries(
   SECTION_DEFINITIONS.map(({ key, heading }) => [
     key,
@@ -142,17 +156,32 @@ function applyMandatoryIdentityTraits(sections: PromptSections, personalTraits?:
   };
 }
 
-function preventLiteralClosingDuplication(method: PromptMethod, value: string) {
+function cleanStyleRenderQuality(method: PromptMethod, value: string) {
   const cleaned = cleanSection(value);
   const escapedClosing = METHOD_SPECS[method].closing.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const withoutClosing = cleaned.replace(new RegExp(escapedClosing, "gi"), "").trim();
-  return withoutClosing || EMPTY_SECTION_FALLBACK;
+  const withoutFixedLanguage = FIXED_CLOSING_STYLE_LANGUAGE.reduce(
+    (result, pattern) => result.replace(pattern, ""),
+    withoutClosing
+  );
+  const polished = withoutFixedLanguage
+    .replace(/\bwith\s*,\s*/gi, "")
+    .replace(/\bwith\s*(?=[,.;!?]|$)/gi, "")
+    .replace(/(?:,\s*){2,}/g, ", ")
+    .replace(/\s+([,.;!?])/g, "$1")
+    .replace(/\s+(?:and|or)\s*(?=[.!?]|$)/gi, "")
+    .replace(/^[,;:\s]+/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .replace(/^([a-z])/, (_, initial) => initial.toUpperCase());
+
+  return polished || STYLE_SECTION_FALLBACK;
 }
 
 export function renderMethodPrompt(method: PromptMethod, sections: PromptSections, personalTraits?: string) {
   const preparedSections = {
     ...sections,
-    styleRenderQuality: preventLiteralClosingDuplication(method, sections.styleRenderQuality),
+    styleRenderQuality: cleanStyleRenderQuality(method, sections.styleRenderQuality),
   };
   const lockedSections = applyMandatoryIdentityTraits(preparedSections, personalTraits);
   const body = SECTION_DEFINITIONS.map(({ key, heading }) => `${heading}\n${lockedSections[key]}`).join("\n\n");

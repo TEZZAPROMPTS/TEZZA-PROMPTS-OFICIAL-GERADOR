@@ -88,3 +88,8 @@
 - [x] Restaurar STYLE & RENDER QUALITY como descrição variável da cena, conforme a base anexada.
 - [x] Garantir que o encerramento completo autorizado apareça somente após STYLE & RENDER QUALITY, uma única vez.
 - [x] Impedir duplicações do fechamento sem substituir o conteúdo variável válido da seção de estilo.
+- [x] Remover de STYLE & RENDER QUALITY termos fixos do encerramento, inclusive quando vierem parafraseados.
+- [x] Preservar os detalhes variáveis de iluminação, textura e composição após filtrar termos de fechamento.
+- [x] Testar a limpeza da variante anexada com Blender Cycles, Seedream e virtual-avatar aesthetics.
+- [x] Testar STYLE & RENDER QUALITY mista, preservando iluminação, textura e composição após remover termos fixos.
+- [x] Validar o mesmo comportamento no Método Masculino com detalhes variáveis reais da cena.
