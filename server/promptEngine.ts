@@ -60,20 +60,6 @@ export const METHOD_ONE_CLOSING = METHOD_SPECS.feminine.closing;
 const EMPTY_SECTION_FALLBACK =
   "Render this element with cohesive, high-end virtual editorial detail that remains faithful to the provided direction.";
 
-const STYLE_SECTION_FALLBACK =
-  "The scene is rendered with cohesive material textures, depth, and visual treatment that reflect the requested direction.";
-
-const FIXED_CLOSING_STYLE_LANGUAGE = [
-  /\bhigh-fidelity\b/gi,
-  /\bblender\s+cycles(?:\s+(?:cgi\s+)?render(?:ing)?)?\b/gi,
-  /\bseedream\s*5(?:\.0)?(?:\s+(?:(?:masculine\s+)?beauty\s+(?:shaders?|rendering)))?\b/gi,
-  /\b(?:cinematic\s+)?virtual-?avatar\s+aesthetics?\b/gi,
-  /\bimvu-inspired(?:\s+avatar)?(?:\s+repaint)?\s+aesthetics?\b/gi,
-  /\badvanced\s+ray\s+tracing\b/gi,
-  /\b8k\s+uhd(?:\s+quality)?\b/gi,
-  /\bpolished\s+virtual\s+influencer\s+(?:atmosphere|styling)\b/gi,
-];
-
 const JSON_PROPERTIES = Object.fromEntries(
   SECTION_DEFINITIONS.map(({ key, heading }) => [
     key,
@@ -156,37 +142,15 @@ function applyMandatoryIdentityTraits(sections: PromptSections, personalTraits?:
   };
 }
 
-function cleanStyleRenderQuality(method: PromptMethod, value: string) {
-  const cleaned = cleanSection(value);
-  const escapedClosing = METHOD_SPECS[method].closing.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const withoutClosing = cleaned.replace(new RegExp(escapedClosing, "gi"), "").trim();
-  const withoutFixedLanguage = FIXED_CLOSING_STYLE_LANGUAGE.reduce(
-    (result, pattern) => result.replace(pattern, ""),
-    withoutClosing
-  );
-  const polished = withoutFixedLanguage
-    .replace(/\bwith\s*,\s*/gi, "")
-    .replace(/\bwith\s*(?=[,.;!?]|$)/gi, "")
-    .replace(/(?:,\s*){2,}/g, ", ")
-    .replace(/\s+([,.;!?])/g, "$1")
-    .replace(/\s+(?:and|or)\s*(?=[.!?]|$)/gi, "")
-    .replace(/^[,;:\s]+/, "")
-    .replace(/\s{2,}/g, " ")
-    .trim()
-    .replace(/^([a-z])/, (_, initial) => initial.toUpperCase());
-
-  return polished || STYLE_SECTION_FALLBACK;
-}
-
 export function renderMethodPrompt(method: PromptMethod, sections: PromptSections, personalTraits?: string) {
+  const spec = METHOD_SPECS[method];
   const preparedSections = {
     ...sections,
-    styleRenderQuality: cleanStyleRenderQuality(method, sections.styleRenderQuality),
+    styleRenderQuality: spec.closing,
   };
   const lockedSections = applyMandatoryIdentityTraits(preparedSections, personalTraits);
   const body = SECTION_DEFINITIONS.map(({ key, heading }) => `${heading}\n${lockedSections[key]}`).join("\n\n");
-  const spec = METHOD_SPECS[method];
-  return `${spec.opening}\n\n${body}\n\n${spec.closing}`;
+  return `${spec.opening}\n\n${body}`;
 }
 
 export function renderMethodOnePrompt(sections: PromptSections) {
@@ -207,17 +171,17 @@ export function buildGenerationMessages(input: {
     ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nThese are the highest-priority rules. Translate them into natural English prompt prose and apply them faithfully in the relevant sections. They override generic base styling whenever there is a conflict. You MUST include all face-identity traits in FACE & IDENTITY, all hair-specific traits in HAIR, and all body-specific traits in BODY & PHYSIQUE. The renderer will independently lock the complete trait set into FACE & IDENTITY as a final safeguard. Do not expose this label, any “insert here” marker, or the original Portuguese wording in the final prompt.`
     : "No additional personal traits were supplied.";
 
-  const system = `You are the content engine for TEZZA PROMPTS. Produce only a strict JSON object matching the supplied schema. Write every value in polished English prose. The final renderer—not you—will add the method's immutable opening, immutable closing, and the 14 immutable section headings.
+  const system = `You are the content engine for TEZZA PROMPTS. Produce only a strict JSON object matching the supplied schema. Write every value in polished English prose. The final renderer—not you—will add the method's immutable opening, immutable STYLE & RENDER QUALITY text, and the 14 immutable section headings.
 
 METHOD IDENTITY: ${spec.baseDirection}
 
-OUTPUT CONTRACT: Populate exactly these sections, in their intended scope: CAMERA & COMPOSITION (aspect ratio, shot, framing, angle, focus); POSE & BODY POSITIONING (stance, torso, arms, hands, physical positioning); HEAD POSITION & GAZE (head angle, chin, eye direction); FACIAL EXPRESSION (emotion and mouth/eye expression); FACE & IDENTITY (adult ${spec.avatarDescription}, facial structure, skin tone and identity); HAIR (colour, type, texture, fall and movement); ACCESSORIES & DETAILS (only visibly supported accessories and grooming); OUTFIT (garments, fabrics and styling); BODY & PHYSIQUE (proportions and anatomy); SKIN & REALISM (pores, highlights and CGI material detail); LIGHTING (flash, ambient sources, reflections and shadows); ENVIRONMENT (location and background); MOOD & AESTHETIC (editorial atmosphere); STYLE & RENDER QUALITY (CGI render language only).
+OUTPUT CONTRACT: Populate exactly these sections, in their intended scope: CAMERA & COMPOSITION (aspect ratio, shot, framing, angle, focus); POSE & BODY POSITIONING (stance, torso, arms, hands, physical positioning); HEAD POSITION & GAZE (head angle, chin, eye direction); FACIAL EXPRESSION (emotion and mouth/eye expression); FACE & IDENTITY (adult ${spec.avatarDescription}, facial structure, skin tone and identity); HAIR (colour, type, texture, fall and movement); ACCESSORIES & DETAILS (only visibly supported accessories and grooming); OUTFIT (garments, fabrics and styling); BODY & PHYSIQUE (proportions and anatomy); SKIN & REALISM (pores, highlights and CGI material detail); LIGHTING (flash, ambient sources, reflections and shadows); ENVIRONMENT (location and background); MOOD & AESTHETIC (editorial atmosphere); STYLE & RENDER QUALITY (immutable fixed base text; renderer applies it).
 
 PRESERVATION PRIORITY: Preserve all user-supplied facts. In photo mode, the visible direction is absolute for facial structure, hairstyle, expression, pose, hand placement, body position, camera angle, framing, composition, perspective, lighting, clothing, accessories, proportions, and visual identity. Do not invent, substitute, embellish, exaggerate, or reinterpret those elements. In text mode, follow the user's requested direction with the same discipline.
 
 ${priorityTraits}
 
-Rules without exception: never mention an image, photo, picture, reference, upload, source, analysis, the personal-traits label, or any “insert here” marker; never use arrows; never include Markdown or headings in a value; never describe tattoos; never refer to minors; never output an instruction, disclaimer, explanation, or code fence. Keep each value specific to its section, coherent, non-explicit, and suitable for a luxury editorial CGI rendering prompt. Write one concise sentence per section and keep every section under 55 words so the complete JSON response is never truncated. For both methods, STYLE & RENDER QUALITY must describe only the visual treatment of the requested scene. Do not output, repeat, or paraphrase the immutable opening or immutable closing there: the final renderer adds those fixed blocks separately.`;
+Rules without exception: never mention an image, photo, picture, reference, upload, source, analysis, the personal-traits label, or any “insert here” marker; never use arrows; never include Markdown or headings in a value; never describe tattoos; never refer to minors; never output an instruction, disclaimer, explanation, or code fence. Keep each value specific to its section, coherent, non-explicit, and suitable for a luxury editorial CGI rendering prompt. Write one concise sentence per section and keep every section under 55 words so the complete JSON response is never truncated. STYLE & RENDER QUALITY is immutable: its generated value will be replaced by the exact fixed base text for the selected method.`;
 
   if (input.mode === "photo" && input.sceneImageUrl) {
     return [

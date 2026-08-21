@@ -93,3 +93,8 @@
 - [x] Testar a limpeza da variante anexada com Blender Cycles, Seedream e virtual-avatar aesthetics.
 - [x] Testar STYLE & RENDER QUALITY mista, preservando iluminação, textura e composição após remover termos fixos.
 - [x] Validar o mesmo comportamento no Método Masculino com detalhes variáveis reais da cena.
+- [x] Eliminar conectores gramaticais residuais ao substituir a filtragem por uma seção de estilo fixa.
+- [x] Validar que a saída não contém o fragmento “with and” porque a seção é renderizada literalmente.
+- [x] Fixar STYLE & RENDER QUALITY como texto literal da base feminina original, sem conteúdo variável.
+- [x] Fixar STYLE & RENDER QUALITY como texto literal da base masculina original, sem conteúdo variável.
+- [x] Garantir por teste que a seção de estilo seja idêntica ao bloco autorizado em cada método.
