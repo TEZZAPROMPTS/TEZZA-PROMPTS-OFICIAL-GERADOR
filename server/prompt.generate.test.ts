@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "./_core/context";
 import { METHOD_SPECS, SECTION_DEFINITIONS } from "./promptEngine";
 
-const { invokeLLMMock } = vi.hoisted(() => ({ invokeLLMMock: vi.fn() }));
+const { invokeLLMMock, storageGetSignedUrlMock } = vi.hoisted(() => ({ invokeLLMMock: vi.fn(), storageGetSignedUrlMock: vi.fn() }));
 vi.mock("./_core/llm", () => ({ invokeLLM: invokeLLMMock }));
+vi.mock("./storage", () => ({ storageGetSignedUrl: storageGetSignedUrlMock }));
 
 import { appRouter, getFriendlyGenerationError } from "./routers";
 
@@ -17,7 +18,14 @@ function mockStructuredGeneration() {
 }
 
 describe("prompt.generate", () => {
-  beforeEach(() => invokeLLMMock.mockReset());
+  const faceKey = "tezza-prompts/references/face/face-reference.jpg";
+  const sceneKey = "tezza-prompts/references/scene/scene-reference.jpg";
+
+  beforeEach(() => {
+    invokeLLMMock.mockReset();
+    storageGetSignedUrlMock.mockReset();
+    storageGetSignedUrlMock.mockImplementation(async (key: string) => `https://signed-storage.example/${key}`);
+  });
 
   it("generates the independent Masculine prompt and passes traits to the model", async () => {
     mockStructuredGeneration();
@@ -40,10 +48,12 @@ describe("prompt.generate", () => {
   it("sends a selected image as multimodal content for the Feminine method", async () => {
     mockStructuredGeneration();
     const caller = appRouter.createCaller(createContext());
-    await caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageDataUrl: "data:image/png;base64,ZmFrZQ==" });
+    await caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageKey: sceneKey });
 
     const request = invokeLLMMock.mock.calls[0]?.[0];
     expect(request.messages[1].content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "image_url" })]));
+    expect(JSON.stringify(request.messages[1].content)).toContain(`https://signed-storage.example/${sceneKey}`);
+    expect(storageGetSignedUrlMock).toHaveBeenCalledWith(sceneKey);
   });
 
   it("rejects incomplete mode inputs before calling the model", async () => {
@@ -53,23 +63,23 @@ describe("prompt.generate", () => {
     expect(invokeLLMMock).not.toHaveBeenCalled();
   });
 
-  it("rejects an oversized image payload before it reaches the generation service", async () => {
+  it("rejects embedded image payloads before they reach the generation service", async () => {
     const caller = appRouter.createCaller(createContext());
-    const oversizedImage = `data:image/jpeg;base64,${"a".repeat(300_000)}`;
 
-    await expect(caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageDataUrl: oversizedImage })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageKey: "data:image/jpeg;base64,not-allowed" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(invokeLLMMock).not.toHaveBeenCalled();
   });
 
   it("extracts editable face traits independently of the scene image for either method", async () => {
     invokeLLMMock.mockResolvedValue({ choices: [{ message: { content: "```json\n{\"faceIdentity\": \"Almond-shaped hazel eyes, an oval face, and pale skin.\", \"hair\": \"Long wavy blonde hair.\", \"bodyPhysique\": \"\"}\n```" } }] });
     const caller = appRouter.createCaller(createContext());
-    const result = await caller.prompt.extractTraits({ method: "masculine", faceReferenceDataUrl: "data:image/jpeg;base64,ZmFrZQ==" });
+    const result = await caller.prompt.extractTraits({ method: "masculine", faceReferenceKey: faceKey });
 
     expect(result.traits).toContain("Hair: Long wavy blonde hair");
     expect(result.traits).toContain("Face & identity: Almond-shaped hazel eyes");
     const request = invokeLLMMock.mock.calls[0]?.[0];
     expect(request.messages[1].content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "image_url" })]));
+    expect(JSON.stringify(request.messages[1].content)).toContain(`https://signed-storage.example/${faceKey}`);
     expect(String(request.messages[0].content)).toContain("Do not identify the person");
   });
 
@@ -79,7 +89,7 @@ describe("prompt.generate", () => {
       .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ faceIdentity: "Brown eyes and an angular face.", hair: "Short black curly hair.", bodyPhysique: "" }) } }] });
 
     const caller = appRouter.createCaller(createContext());
-    const result = await caller.prompt.extractTraits({ method: "masculine", faceReferenceDataUrl: "data:image/jpeg;base64,ZmFrZQ==" });
+    const result = await caller.prompt.extractTraits({ method: "masculine", faceReferenceKey: faceKey });
 
     expect(result.traits).toContain("Hair: Short black curly hair");
     expect(invokeLLMMock).toHaveBeenCalledTimes(2);
@@ -97,8 +107,8 @@ describe("prompt.generate", () => {
         .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ traits }) } }] })
         .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(sections) } }] });
 
-      const extracted = await caller.prompt.extractTraits({ method, faceReferenceDataUrl: "data:image/jpeg;base64,ZmFjZQ==" });
-      const generated = await caller.prompt.generate({ method, mode: "photo", personalTraits: extracted.traits, sceneImageDataUrl: "data:image/jpeg;base64,c2NlbmU=" });
+      const extracted = await caller.prompt.extractTraits({ method, faceReferenceKey: faceKey });
+      const generated = await caller.prompt.generate({ method, mode: "photo", personalTraits: extracted.traits, sceneImageKey: sceneKey });
 
       expect(generated.prompt.startsWith(METHOD_SPECS[method].opening)).toBe(true);
       expect(generated.prompt).toContain(METHOD_SPECS[method].closing);
@@ -107,11 +117,11 @@ describe("prompt.generate", () => {
     }
 
     const [femaleFace, femaleScene, maleFace, maleScene] = invokeLLMMock.mock.calls.map(call => call[0]);
-    expect(JSON.stringify(femaleFace.messages[1].content)).toContain("ZmFjZQ==");
-    expect(JSON.stringify(femaleScene.messages[1].content)).toContain("c2NlbmU=");
+    expect(JSON.stringify(femaleFace.messages[1].content)).toContain(`https://signed-storage.example/${faceKey}`);
+    expect(JSON.stringify(femaleScene.messages[1].content)).toContain(`https://signed-storage.example/${sceneKey}`);
     expect(String(femaleScene.messages[0].content)).toContain("long wavy blonde hair");
-    expect(JSON.stringify(maleFace.messages[1].content)).toContain("ZmFjZQ==");
-    expect(JSON.stringify(maleScene.messages[1].content)).toContain("c2NlbmU=");
+    expect(JSON.stringify(maleFace.messages[1].content)).toContain(`https://signed-storage.example/${faceKey}`);
+    expect(JSON.stringify(maleScene.messages[1].content)).toContain(`https://signed-storage.example/${sceneKey}`);
     expect(String(maleScene.messages[0].content)).toContain("short black curls");
   });
 
@@ -121,11 +131,10 @@ describe("prompt.generate", () => {
     await expect(caller.prompt.generate({ method: "feminine", mode: "text", userText: "Adult CGI avatar with a minimal luxury editorial direction." })).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: "A IA devolveu uma resposta incompleta. Tente gerar novamente; se necessário, use uma foto de cena mais simples." });
   });
 
-  it("returns a specific validation message when a scene image is too large", async () => {
+  it("returns a specific validation error when a scene reference was not uploaded", async () => {
     const caller = appRouter.createCaller(createContext());
-    const oversizedImage = `data:image/jpeg;base64,${"a".repeat(300_000)}`;
 
-    await expect(caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageDataUrl: oversizedImage })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller.prompt.generate({ method: "feminine", mode: "photo", sceneImageKey: "tezza-prompts/references/face/not-a-scene.jpg" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("maps temporary AI unavailability to a helpful message", () => {

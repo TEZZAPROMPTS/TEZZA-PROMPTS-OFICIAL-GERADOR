@@ -158,7 +158,7 @@ export function buildGenerationMessages(input: {
   mode: GeneratorMode;
   userText?: string;
   personalTraits?: string;
-  sceneImageDataUrl?: string;
+  sceneImageUrl?: string;
 }) {
   const method = input.method ?? "feminine";
   const spec = METHOD_SPECS[method];
@@ -179,14 +179,14 @@ ${priorityTraits}
 
 Rules without exception: never mention an image, photo, picture, reference, upload, source, analysis, the personal-traits label, or any “insert here” marker; never use arrows; never include Markdown or headings in a value; never describe tattoos; never refer to minors; never output an instruction, disclaimer, explanation, or code fence. Keep each value specific to its section, coherent, non-explicit, and suitable for a luxury editorial CGI rendering prompt. Write one concise sentence per section and keep every section under 55 words so the complete JSON response is never truncated.`;
 
-  if (input.mode === "photo" && input.sceneImageDataUrl) {
+  if (input.mode === "photo" && input.sceneImageUrl) {
     return [
       { role: "system" as const, content: system },
       {
         role: "user" as const,
         content: [
           { type: "text" as const, text: "This is the scene reference only. Extract its visible pose, body positioning, head angle, facial expression, framing, camera angle, composition, outfit, accessories, lighting, environment, mood, and render direction with maximum fidelity. Do not use it as the source of facial identity traits, because those traits are supplied separately above. Do not add elements that are not visibly supported, except the explicit non-negotiable personal traits supplied above." },
-          { type: "image_url" as const, image_url: { url: input.sceneImageDataUrl, detail: "high" as const } },
+          { type: "image_url" as const, image_url: { url: input.sceneImageUrl, detail: "high" as const } },
         ],
       },
     ];
@@ -203,7 +203,7 @@ export async function generateMethodPrompt(input: {
   mode: GeneratorMode;
   userText?: string;
   personalTraits?: string;
-  sceneImageDataUrl?: string;
+  sceneImageUrl?: string;
 }) {
   const method = input.method ?? "feminine";
   const request = {
@@ -242,7 +242,7 @@ export async function generateMethodPrompt(input: {
   throw new Error("The generation service returned an invalid structured response.");
 }
 
-export function buildFaceTraitMessages(input: { method: PromptMethod; faceReferenceDataUrl: string }) {
+export function buildFaceTraitMessages(input: { method: PromptMethod; faceReferenceUrl: string }) {
   const method = input.method;
   const role = method === "feminine" ? "an adult feminine avatar" : "an adult masculine avatar";
   return [
@@ -254,13 +254,13 @@ export function buildFaceTraitMessages(input: { method: PromptMethod; faceRefere
       role: "user" as const,
       content: [
         { type: "text" as const, text: "Extract editable visual face traits only. The traits will be combined later with a separate scene image." },
-        { type: "image_url" as const, image_url: { url: input.faceReferenceDataUrl, detail: "high" as const } },
+        { type: "image_url" as const, image_url: { url: input.faceReferenceUrl, detail: "high" as const } },
       ],
     },
   ];
 }
 
-export async function extractFaceTraits(input: { method: PromptMethod; faceReferenceDataUrl: string }) {
+export async function extractFaceTraits(input: { method: PromptMethod; faceReferenceUrl: string }) {
   const request = {
     model: "gemini-3-flash-preview",
     messages: buildFaceTraitMessages(input),

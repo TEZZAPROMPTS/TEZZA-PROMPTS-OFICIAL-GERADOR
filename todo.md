@@ -62,3 +62,9 @@
 - [x] Validar por HTTP que extração de rosto e geração por cena retornam JSON para payloads válidos e erros JSON para payloads grandes.
 - [x] Confirmar por HTTP direto as respostas JSON de sucesso de extração de rosto e geração por cena após a redução dos limites.
 - [x] Confirmar por HTTP direto que payloads de rosto e cena acima do novo limite retornam erro JSON estruturado, sem HTML do gateway.
+- [x] Migrar as imagens de rosto e cena para upload seguro antes das mutações de IA.
+- [x] Fazer a extração automática de traços usar a referência segura do arquivo enviado, sem base64 no corpo da mutação.
+- [x] Fazer a geração por cena usar a referência segura do arquivo enviado, sem base64 no corpo da mutação.
+- [x] Validar no navegador que o upload de rosto preenche os traços sem resposta HTML.
+- [x] Criar uma rota multipart segura, validada por tipo e assinatura binária, que armazene imagens temporárias de rosto e cena no S3.
+- [x] Atualizar testes de contrato para aceitar somente referências seguras de arquivo nas mutações multimodais.

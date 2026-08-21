@@ -9,10 +9,11 @@ import { toast } from "sonner";
 type Mode = "text" | "photo";
 type PromptMethod = "feminine" | "masculine";
 type PromptHistoryEntry = { id: string; createdAt: number; mode: Mode; method: PromptMethod; label: string; prompt: string };
+type UploadedImage = { key: string; url: string; contentType: string; size: number };
 
 const SESSION_HISTORY_KEY = "tezza-prompts-session-history";
 const MAX_UPLOAD_FILE_SIZE = 8 * 1024 * 1024;
-const MAX_MUTATION_IMAGE_LENGTH = 260_000;
+const MAX_OPTIMIZED_IMAGE_SIZE = 2 * 1024 * 1024;
 const METHOD_COPY: Record<PromptMethod, { label: string; subtitle: string; input: string }> = {
   feminine: { label: "Método Feminino", subtitle: "Avatar CGI feminino", input: "Uma avatar adulta em um rooftop de São Paulo à noite, cabelo cacheado solto, vestido preto minimalista e flash de smartphone..." },
   masculine: { label: "Método Masculino", subtitle: "Avatar CGI masculino", input: "Um avatar adulto em uma varanda urbana noturna, cabelo curto preto, visual editorial e luz de flash cinematográfica..." },
@@ -22,7 +23,7 @@ function makeEntry(prompt: string, mode: Mode, method: PromptMethod, label: stri
   return { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, createdAt: Date.now(), mode, method, label: label.trim().slice(0, 72) || (mode === "photo" ? "Direção visual pela foto" : "Nova direção em texto"), prompt };
 }
 
-async function compressImageForGeneration(file: File): Promise<string> {
+async function optimizeImageForUpload(file: File): Promise<File> {
   const sourceUrl = URL.createObjectURL(file);
   try {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -33,8 +34,9 @@ async function compressImageForGeneration(file: File): Promise<string> {
     });
 
     const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
-    const targetSizes = [1280, 1080, 900, 760, 640, 540];
-    const qualities = [0.70, 0.62, 0.54, 0.46, 0.40, 0.34];
+    const targetSizes = [1600, 1280, 1080, 900];
+    const qualities = [0.78, 0.72, 0.66, 0.60];
+    let optimized: File | null = null;
 
     for (let index = 0; index < targetSizes.length; index += 1) {
       const scale = Math.min(1, targetSizes[index] / longestSide);
@@ -44,14 +46,34 @@ async function compressImageForGeneration(file: File): Promise<string> {
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Não foi possível preparar esta imagem.");
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", qualities[index]);
-      if (dataUrl.length <= MAX_MUTATION_IMAGE_LENGTH) return dataUrl;
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", qualities[index]));
+      if (!blob) throw new Error("Não foi possível preparar esta imagem.");
+      optimized = new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "referencia"}.jpg`, { type: "image/jpeg" });
+      if (optimized.size <= MAX_OPTIMIZED_IMAGE_SIZE) return optimized;
     }
 
-    throw new Error("A imagem não pôde ser otimizada. Tente uma foto menor ou com menos detalhes.");
+    if (optimized) return optimized;
+    throw new Error("A imagem não pôde ser preparada. Tente uma foto menor ou com menos detalhes.");
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
+}
+
+async function uploadImage(file: File, kind: "face" | "scene"): Promise<UploadedImage> {
+  const formData = new FormData();
+  formData.append("image", file, file.name);
+  formData.append("kind", kind);
+  const response = await fetch("/api/upload-image", { method: "POST", body: formData, credentials: "same-origin" });
+  const payload: unknown = await response.json().catch(() => null);
+  const message = payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+    ? payload.message
+    : "Não foi possível enviar esta imagem agora. Tente novamente.";
+
+  if (!response.ok || !payload || typeof payload !== "object" || !("key" in payload) || typeof payload.key !== "string") {
+    throw new Error(message);
+  }
+
+  return payload as UploadedImage;
 }
 
 export default function Home() {
@@ -59,18 +81,24 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("text");
   const [direction, setDirection] = useState("");
   const [personalTraits, setPersonalTraits] = useState("");
-  const [sceneImageDataUrl, setSceneImageDataUrl] = useState<string | null>(null);
+  const [sceneImageKey, setSceneImageKey] = useState<string | null>(null);
+  const [sceneImagePreviewUrl, setSceneImagePreviewUrl] = useState<string | null>(null);
   const [sceneImageName, setSceneImageName] = useState("");
   const [sceneError, setSceneError] = useState("");
-  const [faceReferenceDataUrl, setFaceReferenceDataUrl] = useState<string | null>(null);
+  const [sceneUploadPending, setSceneUploadPending] = useState(false);
+  const [faceReferenceKey, setFaceReferenceKey] = useState<string | null>(null);
+  const [faceReferencePreviewUrl, setFaceReferencePreviewUrl] = useState<string | null>(null);
   const [faceReferenceName, setFaceReferenceName] = useState("");
   const [faceError, setFaceError] = useState("");
+  const [faceUploadPending, setFaceUploadPending] = useState(false);
   const [faceTraitsStatus, setFaceTraitsStatus] = useState<"idle" | "extracting" | "ready" | "error">("idle");
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [history, setHistory] = useState<PromptHistoryEntry[]>([]);
   const [copied, setCopied] = useState(false);
   const sceneFileInputRef = useRef<HTMLInputElement>(null);
   const faceFileInputRef = useRef<HTMLInputElement>(null);
+  const sceneUploadIdRef = useRef(0);
+  const faceUploadIdRef = useRef(0);
 
   useEffect(() => {
     try {
@@ -113,13 +141,26 @@ export default function Home() {
     if (!file) return;
     if (!file.type.startsWith("image/")) return setSceneError("Escolha uma imagem em JPG, PNG ou WEBP.");
     if (file.size > MAX_UPLOAD_FILE_SIZE) return setSceneError("A imagem deve ter até 8 MB.");
+    const uploadId = ++sceneUploadIdRef.current;
+    const previewUrl = URL.createObjectURL(file);
+    if (sceneImagePreviewUrl) URL.revokeObjectURL(sceneImagePreviewUrl);
+    setSceneImagePreviewUrl(previewUrl);
+    setSceneImageKey(null);
+    setSceneImageName(file.name.replace(/\.[^.]+$/, ""));
+    setSceneUploadPending(true);
     try {
-      const optimizedImage = await compressImageForGeneration(file);
-      setSceneImageDataUrl(optimizedImage);
-      setSceneImageName(file.name.replace(/\.[^.]+$/, ""));
+      const optimizedImage = await optimizeImageForUpload(file);
+      const uploaded = await uploadImage(optimizedImage, "scene");
+      if (uploadId !== sceneUploadIdRef.current) return;
+      setSceneImageKey(uploaded.key);
     } catch (error) {
-      setSceneImageDataUrl(null);
+      if (uploadId !== sceneUploadIdRef.current) return;
+      URL.revokeObjectURL(previewUrl);
+      setSceneImagePreviewUrl(null);
+      setSceneImageKey(null);
       setSceneError(error instanceof Error ? error.message : "Não foi possível preparar esta imagem.");
+    } finally {
+      if (uploadId === sceneUploadIdRef.current) setSceneUploadPending(false);
     }
   }
 
@@ -129,30 +170,44 @@ export default function Home() {
     if (!file) return;
     if (!file.type.startsWith("image/")) return setFaceError("Escolha uma imagem em JPG, PNG ou WEBP.");
     if (file.size > MAX_UPLOAD_FILE_SIZE) return setFaceError("A imagem deve ter até 8 MB.");
+    const uploadId = ++faceUploadIdRef.current;
+    const previewUrl = URL.createObjectURL(file);
+    if (faceReferencePreviewUrl) URL.revokeObjectURL(faceReferencePreviewUrl);
+    setFaceReferencePreviewUrl(previewUrl);
+    setFaceReferenceKey(null);
+    setFaceReferenceName(file.name.replace(/\.[^.]+$/, ""));
+    setFaceUploadPending(true);
+    setFaceTraitsStatus("extracting");
     try {
-      const optimizedImage = await compressImageForGeneration(file);
-      setFaceReferenceDataUrl(optimizedImage);
-      setFaceReferenceName(file.name.replace(/\.[^.]+$/, ""));
-      setFaceTraitsStatus("extracting");
-      extractTraitsMutation.mutate({ method, faceReferenceDataUrl: optimizedImage });
+      const optimizedImage = await optimizeImageForUpload(file);
+      const uploaded = await uploadImage(optimizedImage, "face");
+      if (uploadId !== faceUploadIdRef.current) return;
+      setFaceReferenceKey(uploaded.key);
+      setFaceUploadPending(false);
+      await extractTraitsMutation.mutateAsync({ method, faceReferenceKey: uploaded.key });
     } catch (error) {
-      setFaceReferenceDataUrl(null);
+      if (uploadId !== faceUploadIdRef.current) return;
+      URL.revokeObjectURL(previewUrl);
+      setFaceReferencePreviewUrl(null);
+      setFaceReferenceKey(null);
       setFaceTraitsStatus("error");
       setFaceError(error instanceof Error ? error.message : "Não foi possível preparar esta imagem.");
+    } finally {
+      if (uploadId === faceUploadIdRef.current) setFaceUploadPending(false);
     }
   }
 
-  function clearSceneImage() { setSceneImageDataUrl(null); setSceneImageName(""); setSceneError(""); if (sceneFileInputRef.current) sceneFileInputRef.current.value = ""; }
-  function clearFaceReference() { setFaceReferenceDataUrl(null); setFaceReferenceName(""); setFaceError(""); setFaceTraitsStatus("idle"); extractTraitsMutation.reset(); if (faceFileInputRef.current) faceFileInputRef.current.value = ""; }
+  function clearSceneImage() { ++sceneUploadIdRef.current; if (sceneImagePreviewUrl) URL.revokeObjectURL(sceneImagePreviewUrl); setSceneImageKey(null); setSceneImagePreviewUrl(null); setSceneImageName(""); setSceneError(""); setSceneUploadPending(false); if (sceneFileInputRef.current) sceneFileInputRef.current.value = ""; }
+  function clearFaceReference() { ++faceUploadIdRef.current; if (faceReferencePreviewUrl) URL.revokeObjectURL(faceReferencePreviewUrl); setFaceReferenceKey(null); setFaceReferencePreviewUrl(null); setFaceReferenceName(""); setFaceError(""); setFaceUploadPending(false); setFaceTraitsStatus("idle"); extractTraitsMutation.reset(); if (faceFileInputRef.current) faceFileInputRef.current.value = ""; }
   function extractFaceTraits() {
-    if (!faceReferenceDataUrl) return setFaceError("Envie uma foto de rosto para extrair os traços.");
+    if (!faceReferenceKey) return setFaceError("Aguarde o envio da foto de rosto antes de extrair os traços.");
     setFaceTraitsStatus("extracting");
-    extractTraitsMutation.mutate({ method, faceReferenceDataUrl });
+    extractTraitsMutation.mutate({ method, faceReferenceKey });
   }
   function generatePrompt() {
     if (mode === "text") return generateMutation.mutate({ method, mode, userText: direction, personalTraits });
-    if (!sceneImageDataUrl) return setSceneError("Envie uma imagem de cena para gerar pelo modo Foto.");
-    generateMutation.mutate({ method, mode, sceneImageDataUrl, personalTraits });
+    if (!sceneImageKey) return setSceneError("Aguarde o envio da imagem de cena antes de gerar pelo modo Foto.");
+    generateMutation.mutate({ method, mode, sceneImageKey, personalTraits });
   }
   async function copyPrompt(prompt = generatedPrompt) {
     if (!prompt) return;
@@ -190,24 +245,24 @@ export default function Home() {
                 <div className="mt-6">
                   <label className="field-label">IMAGEM DA CENA <span>POSE, ROUPA E AMBIENTE</span></label>
                   <input ref={sceneFileInputRef} onChange={handleScenePhotoChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="scene-upload" type="file" />
-                  {sceneImageDataUrl ? (
-                    <div className="relative overflow-hidden rounded-3xl border border-white/15"><img src={sceneImageDataUrl} alt="Prévia da cena selecionada" className="h-[210px] w-full object-cover opacity-85" /><div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-4 pt-12"><p className="min-w-0 truncate font-soft text-xs">{sceneImageName}</p><button onClick={clearSceneImage} className="grid h-8 w-8 place-items-center rounded-full border border-white/35 bg-black/80 text-white" aria-label="Remover imagem de cena"><X className="h-4 w-4" /></button></div></div>
+                  {sceneImagePreviewUrl ? (
+                    <div className="relative overflow-hidden rounded-3xl border border-white/15"><img src={sceneImagePreviewUrl} alt="Prévia da cena selecionada" className="h-[210px] w-full object-cover opacity-85" /><div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-black via-black/80 to-transparent px-4 pb-4 pt-12"><p className="min-w-0 truncate font-soft text-xs">{sceneUploadPending ? "Enviando imagem..." : sceneImageName}</p><button onClick={clearSceneImage} className="grid h-8 w-8 place-items-center rounded-full border border-white/35 bg-black/80 text-white" aria-label="Remover imagem de cena"><X className="h-4 w-4" /></button></div></div>
                   ) : <label htmlFor="scene-upload" className="upload-box"><ImageIcon className="h-5 w-5" /><p>Enviar imagem da cena</p><small>Pose, roupa, ambiente e composição · até 8 MB</small></label>}
                   {sceneError && <p className="mt-3 font-soft text-xs text-white/72">{sceneError}</p>}
                 </div>
               )}
               <div className="mt-6 rounded-2xl border border-white/12 bg-white/[0.025] p-4">
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="field-label mb-1">ROSTO DE REFERÊNCIA <span>EXTRAÇÃO AUTOMÁTICA</span></p><p className="font-soft text-[11px] leading-5 text-white/45">Ao enviar a foto, os traços serão preenchidos automaticamente. A cena continua sendo uma imagem separada.</p></div><button type="button" onClick={extractFaceTraits} disabled={!faceReferenceDataUrl || extractTraitsMutation.isPending} className="copy-button shrink-0 disabled:opacity-40">{extractTraitsMutation.isPending ? <><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Extraindo...</> : <><ScanFace className="h-3.5 w-3.5" /> Atualizar traços</>}</button></div>
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="field-label mb-1">ROSTO DE REFERÊNCIA <span>EXTRAÇÃO AUTOMÁTICA</span></p><p className="font-soft text-[11px] leading-5 text-white/45">Ao enviar a foto, os traços serão preenchidos automaticamente. A cena continua sendo uma imagem separada.</p></div><button type="button" onClick={extractFaceTraits} disabled={!faceReferenceKey || faceUploadPending || extractTraitsMutation.isPending} className="copy-button shrink-0 disabled:opacity-40">{faceUploadPending || extractTraitsMutation.isPending ? <><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> Extraindo...</> : <><ScanFace className="h-3.5 w-3.5" /> Atualizar traços</>}</button></div>
                 <input ref={faceFileInputRef} onChange={handleFaceReferenceChange} accept="image/jpeg,image/png,image/webp" className="hidden" id="face-reference-upload" type="file" />
-                {faceReferenceDataUrl ? (
-                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-2"><img src={faceReferenceDataUrl} alt="Prévia do rosto de referência" className="h-14 w-14 rounded-lg object-cover" /><p className="min-w-0 flex-1 truncate font-soft text-xs text-white/72">{faceReferenceName}</p><button onClick={clearFaceReference} className="grid h-8 w-8 place-items-center rounded-full border border-white/20 text-white/75" aria-label="Remover rosto de referência"><X className="h-4 w-4" /></button></div>
+                {faceReferencePreviewUrl ? (
+                  <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-black/25 p-2"><img src={faceReferencePreviewUrl} alt="Prévia do rosto de referência" className="h-14 w-14 rounded-lg object-cover" /><p className="min-w-0 flex-1 truncate font-soft text-xs text-white/72">{faceUploadPending ? "Enviando foto..." : faceReferenceName}</p><button onClick={clearFaceReference} className="grid h-8 w-8 place-items-center rounded-full border border-white/20 text-white/75" aria-label="Remover rosto de referência"><X className="h-4 w-4" /></button></div>
                 ) : <label htmlFor="face-reference-upload" className="mt-4 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-white/20 px-4 py-3 font-soft text-xs text-white/58 transition hover:border-white/50 hover:text-white"><ScanFace className="h-4 w-4" /> Enviar foto do rosto para extrair traços</label>}
                 {faceTraitsStatus === "extracting" && <p className="mt-3 font-soft text-xs text-white/62">Lendo o rosto e preenchendo os traços editáveis automaticamente...</p>}
                 {faceTraitsStatus === "ready" && <p className="mt-3 font-soft text-xs text-white/62">Traços preenchidos. Você pode revisá-los antes de gerar.</p>}
                 {faceError && <p className="mt-3 font-soft text-xs text-white/72">{faceError}</p>}
               </div>
               <div className="mt-6"><label htmlFor="personal-traits" className="field-label">TRAÇOS E RESTRIÇÕES OBRIGATÓRIAS <span>EDITÁVEL</span></label><textarea id="personal-traits" value={personalTraits} onChange={event => setPersonalTraits(event.target.value)} placeholder="Ex.: manter cabelo loiro; liso, com caimento fluido; rosto oval; olhos castanhos; preservar proporções e identidade visual; não incluir tatuagens..." className="mono-input min-h-[138px]" /><p className="mt-2 font-soft text-[11px] leading-5 text-white/42">A foto de rosto pode preencher estes traços automaticamente. Revise ou edite antes de gerar.</p></div>
-              <Button onClick={generatePrompt} disabled={generateMutation.isPending || extractTraitsMutation.isPending || (Boolean(faceReferenceDataUrl) && faceTraitsStatus !== "ready") || (mode === "text" ? direction.trim().length < 8 : !sceneImageDataUrl)} className="tezza-button mt-7 h-12 w-full rounded-full font-soft text-sm font-bold text-black"><>{generateMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Estruturando...</> : extractTraitsMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Lendo os traços do rosto...</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar {METHOD_COPY[method].label} <ArrowUpRight className="ml-1 h-4 w-4" /></>}</></Button>
+              <Button onClick={generatePrompt} disabled={generateMutation.isPending || sceneUploadPending || faceUploadPending || extractTraitsMutation.isPending || (Boolean(faceReferencePreviewUrl) && faceTraitsStatus !== "ready") || (mode === "text" ? direction.trim().length < 8 : !sceneImageKey)} className="tezza-button mt-7 h-12 w-full rounded-full font-soft text-sm font-bold text-black"><>{generateMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Estruturando...</> : faceUploadPending || extractTraitsMutation.isPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Lendo os traços do rosto...</> : sceneUploadPending ? <><LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Enviando imagem...</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar {METHOD_COPY[method].label} <ArrowUpRight className="ml-1 h-4 w-4" /></>}</></Button>
               <p className="mt-3 text-center font-soft text-[9px] font-bold tracking-[0.13em] text-white/39">INGLÊS · ESTRUTURA FIXA · TEXTO COPIÁVEL</p>
             </div>
 

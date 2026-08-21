@@ -5,6 +5,10 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { extractFaceTraits, generateMethodPrompt } from "./promptEngine";
 import { publicProcedure, router } from "./_core/trpc";
+import { storageGetSignedUrl } from "./storage";
+
+const FACE_REFERENCE_KEY = /^tezza-prompts\/references\/face\//;
+const SCENE_REFERENCE_KEY = /^tezza-prompts\/references\/scene\//;
 
 export function getFriendlyGenerationError(error: unknown, action: "traits" | "prompt") {
   const detail = error instanceof Error ? error.message.toLowerCase() : "";
@@ -36,12 +40,13 @@ export const appRouter = router({
       .input(
         z.object({
           method: z.enum(["feminine", "masculine"]),
-          faceReferenceDataUrl: z.string().max(300_000, "A imagem do rosto ainda está grande demais. Escolha uma imagem menor.").refine(value => value.startsWith("data:image/"), "Escolha uma imagem de rosto válida."),
+          faceReferenceKey: z.string().min(1).max(500).regex(FACE_REFERENCE_KEY, "Envie uma foto de rosto válida antes de extrair os traços."),
         })
       )
       .mutation(async ({ input }) => {
         try {
-          const traits = await extractFaceTraits(input);
+          const faceReferenceUrl = await storageGetSignedUrl(input.faceReferenceKey);
+          const traits = await extractFaceTraits({ method: input.method, faceReferenceUrl });
           return { traits };
         } catch (error) {
           console.error("[Tezza Prompts] Face trait extraction failed", error);
@@ -56,16 +61,17 @@ export const appRouter = router({
             mode: z.enum(["text", "photo"]),
             userText: z.string().trim().min(8).max(2400).optional(),
             personalTraits: z.string().trim().max(1800).optional(),
-            sceneImageDataUrl: z.string().max(300_000, "A imagem da cena ainda está grande demais. Escolha uma imagem menor.").optional(),
+            sceneImageKey: z.string().min(1).max(500).regex(SCENE_REFERENCE_KEY, "Envie uma imagem de cena válida antes de gerar.").optional(),
           })
           .superRefine((value, ctx) => {
             if (value.mode === "text" && !value.userText) ctx.addIssue({ code: "custom", message: "Descreva um pouco mais a direção desejada para o prompt." });
-            if (value.mode === "photo" && !value.sceneImageDataUrl?.startsWith("data:image/")) ctx.addIssue({ code: "custom", message: "Escolha uma imagem de cena válida para analisar." });
+            if (value.mode === "photo" && !value.sceneImageKey) ctx.addIssue({ code: "custom", message: "Escolha uma imagem de cena válida para analisar." });
           })
       )
       .mutation(async ({ input }) => {
         try {
-          const prompt = await generateMethodPrompt(input);
+          const sceneImageUrl = input.sceneImageKey ? await storageGetSignedUrl(input.sceneImageKey) : undefined;
+          const prompt = await generateMethodPrompt({ ...input, sceneImageUrl });
           return { prompt, method: input.method };
         } catch (error) {
           console.error("[Tezza Prompts] Generation failed", error);
