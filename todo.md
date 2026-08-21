@@ -76,3 +76,12 @@
 - [x] Adicionar teste de interface para confirmar a barra de progresso e seus atributos acessíveis durante estados ativos.
 - [x] Validar por cenário ponta a ponta os estágios ativos de preparo, envio e análise para rosto e cena.
 - [x] Registrar os anúncios acessíveis das barras em execução durante upload e análise.
+- [x] Impedir a repetição de termos fixos do encerramento na seção STYLE & RENDER QUALITY do Método Feminino, preservando o fechamento autorizado.
+- [x] Garantir por teste que o fechamento feminino permaneça idêntico à base fixa autorizada, sem extensões do modelo.
+- [x] Preservar literalmente a abertura e o encerramento femininos confirmados pela usuária.
+- [x] Remover somente a repetição dos termos fixos na seção STYLE & RENDER QUALITY do Método Feminino.
+- [x] Preservar literalmente a abertura e o encerramento masculinos confirmados pela usuária.
+- [x] Remover somente a repetição dos termos fixos na seção STYLE & RENDER QUALITY do Método Masculino.
+- [x] Garantir por teste que os fechamentos dos dois métodos permaneçam idênticos às bases autorizadas.
+- [x] Validar que o encerramento feminino permanece exatamente igual à base autorizada da usuária.
+- [x] Remover a repetição de termos fixos do encerramento feminino apenas da seção STYLE & RENDER QUALITY.
