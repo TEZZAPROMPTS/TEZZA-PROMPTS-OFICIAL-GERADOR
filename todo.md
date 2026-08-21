@@ -104,3 +104,9 @@
 - [x] Configurar TEZZA-PROMPTS-OFICIAL-GERADOR como remoto autorizado do projeto.
 - [x] Enviar a versão atual do Tezza Prompts ao repositório público novo.
 - [x] Confirmar no GitHub os arquivos e o commit enviados ao novo repositório.
+- [x] Atualizar o nome exibido e o título do navegador para TEZZA PROMPTS OFICIAL GERADOR.
+- [x] Validar em desktop e celular a exibição legível da nova marca, sem alterar os fluxos do gerador.
+
+## Solicitação cancelada pela usuária
+
+- Login e histórico permanente por usuário: não implementado, pois a usuária solicitou apenas a explicação da melhoria.

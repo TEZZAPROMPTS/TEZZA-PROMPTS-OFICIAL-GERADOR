@@ -260,11 +260,11 @@ export default function Home() {
     <div className="black-grid min-h-screen overflow-x-hidden text-white">
       <main className="relative mx-auto max-w-[1380px] px-4 pb-14 pt-5 sm:px-8 lg:px-12">
         <header className="flex items-center border-b border-white/15 pb-5">
-          <div className="flex items-center gap-3"><span className="bow-mark" aria-hidden="true" /><div><p className="font-display text-3xl leading-none tracking-[-0.05em]">Tezza</p><p className="mt-1 font-soft text-[9px] font-bold tracking-[0.22em] text-white/55">PROMPTS OFICIAL</p></div></div>
+          <div className="flex items-center gap-3"><span className="bow-mark" aria-hidden="true" /><div><p className="font-display text-3xl leading-none tracking-[-0.05em]">Tezza</p><p className="mt-1 font-soft text-[9px] font-bold tracking-[0.22em] text-white/55">PROMPTS OFICIAL GERADOR</p></div></div>
         </header>
 
         <section className="pb-10 pt-12 text-center sm:pt-16">
-          <div className="mx-auto max-w-4xl"><p className="font-display text-6xl leading-none tracking-[-0.06em] text-white sm:text-7xl">TEZZA PROMPTS OFICIAL</p><h1 className="mt-5 font-display text-5xl leading-[0.92] tracking-[-0.055em] text-white/88 sm:text-6xl">Gere prompts<br /><em className="font-normal text-white/60">perfeitos em segundos.</em></h1><p className="mx-auto mt-5 max-w-xl font-soft text-sm leading-6 text-white/58">Escolha o método, descreva sua ideia ou envie uma foto e receba um prompt otimizado para criar imagens realistas e profissionais.</p></div>
+          <div className="mx-auto max-w-5xl"><p className="font-display text-5xl leading-[0.88] tracking-[-0.06em] text-white sm:text-6xl">TEZZA PROMPTS OFICIAL<br />GERADOR</p><h1 className="mt-5 font-display text-5xl leading-[0.92] tracking-[-0.055em] text-white/88 sm:text-6xl">Gere prompts<br /><em className="font-normal text-white/60">perfeitos em segundos.</em></h1><p className="mx-auto mt-5 max-w-xl font-soft text-sm leading-6 text-white/58">Escolha o método, descreva sua ideia ou envie uma foto e receba um prompt otimizado para criar imagens realistas e profissionais.</p></div>
         </section>
 
         <section className="tezza-card mx-auto max-w-6xl rounded-[2rem] p-5 sm:p-8 lg:p-10">
