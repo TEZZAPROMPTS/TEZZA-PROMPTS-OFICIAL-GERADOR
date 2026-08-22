@@ -120,6 +120,9 @@
 - [x] Validar em ambos os métodos que cada grupo de traços permanece em sua seção correta, sem textos técnicos.
 - [x] Cobrir a extração estruturada do campo skinRealism junto aos campos de rosto, cabelo e corpo.
 - [x] Validar de ponta a ponta, nos dois métodos, que os traços extraídos chegam somente às seções correspondentes do prompt final.
+- [x] Adicionar seletor de formato com 1:1, 9:16, 16:9 e 4:5 na interface de geração.
+- [x] Enviar a proporção selecionada à geração de texto e foto e fixá-la em CAMERA & COMPOSITION.
+- [x] Cobrir por testes as quatro proporções e validar a experiência em computador e celular.
 
 ## Solicitação cancelada pela usuária
 

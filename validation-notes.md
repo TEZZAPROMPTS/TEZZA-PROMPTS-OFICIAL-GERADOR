@@ -6,3 +6,5 @@
 - No modo Foto, uma imagem de cena foi enviada com sucesso por multipart, recebeu prévia local independente e habilitou a ação de geração sem reintroduzir dados de imagem no corpo da mutação.
 - A ação de geração multimodal foi acionada após as duas referências seguras estarem disponíveis; a resposta assíncrona do modelo permanece em validação nesta etapa.
 - A geração multimodal foi concluída no navegador com sucesso. O resultado em inglês trouxe a abertura fixa do Método Feminino, as 14 seções na ordem esperada, o fechamento fixo e os traços de rosto extraídos; não houve resposta HTML nem erro de JSON do gateway.
+- Em 2026-08-22, o seletor de formato foi validado em desktop: 1:1, 9:16, 16:9 e 4:5 aparecem antes da direção criativa, com 9:16 ativo por padrão e contraste visível para a escolha ativa.
+- Em 2026-08-22, a visualização móvel confirmou que as quatro opções permanecem legíveis em uma grade de duas colunas e que o painel não apresenta sobreposição horizontal.

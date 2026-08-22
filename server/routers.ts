@@ -61,6 +61,7 @@ export const appRouter = router({
             mode: z.enum(["text", "photo"]),
             userText: z.string().trim().min(8).max(2400).optional(),
             personalTraits: z.string().trim().max(1800).optional(),
+            aspectRatio: z.enum(["1:1", "9:16", "16:9", "4:5"]).default("9:16"),
             sceneImageKey: z.string().min(1).max(500).regex(SCENE_REFERENCE_KEY, "Envie uma imagem de cena válida antes de gerar.").optional(),
           })
           .superRefine((value, ctx) => {

@@ -7,6 +7,7 @@ import {
   renderMethodPrompt,
   type PromptSections,
 } from "./promptEngine";
+import { ASPECT_RATIO_OPTIONS } from "../shared/aspectRatio";
 
 const completeSections = Object.fromEntries(
   SECTION_DEFINITIONS.map(({ key }) => [key, `Precise English description for ${key}.`])
@@ -89,6 +90,17 @@ describe("Tezza prompt methods", () => {
       expect(prompt).toContain("BODY & PHYSIQUE\nSlender shoulders.");
     }
     expect(feminine).not.toContain("Fair warm-toned skin with visible freckles. Generated facial structure.");
+  });
+
+  it("enforces each selected image format in CAMERA & COMPOSITION", () => {
+    for (const option of ASPECT_RATIO_OPTIONS) {
+      const prompt = renderMethodPrompt("feminine", {
+        ...completeSections,
+        cameraComposition: "Vertical 9:16 aspect ratio lifestyle portrait with a low-angle perspective.",
+      }, undefined, option.value);
+      expect(prompt).toContain(`CAMERA & COMPOSITION\n${option.prompt}`);
+      if (option.value !== "9:16") expect(prompt).not.toContain("9:16 aspect ratio");
+    }
   });
 
   it("keeps each supplied base distinct while enforcing the fixed fourteen-section contract", () => {

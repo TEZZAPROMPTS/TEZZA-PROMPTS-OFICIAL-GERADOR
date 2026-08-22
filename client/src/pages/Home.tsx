@@ -3,6 +3,7 @@ import { getMutationErrorMessage } from "@/lib/errorMessage";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { getImageProgressInfo, isImageProgressActive, type ImageKind, type ImageProgressStage } from "@shared/imageProgress";
+import { ASPECT_RATIO_OPTIONS, DEFAULT_ASPECT_RATIO, type AspectRatio } from "@shared/aspectRatio";
 import { ArrowUpRight, Check, Copy, History, ImageIcon, LoaderCircle, RotateCcw, ScanFace, Sparkles, Type, Upload, X } from "lucide-react";
 import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -99,6 +100,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("text");
   const [direction, setDirection] = useState("");
   const [personalTraits, setPersonalTraits] = useState("");
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(DEFAULT_ASPECT_RATIO);
   const [sceneImageKey, setSceneImageKey] = useState<string | null>(null);
   const [sceneImagePreviewUrl, setSceneImagePreviewUrl] = useState<string | null>(null);
   const [sceneImageName, setSceneImageName] = useState("");
@@ -243,10 +245,10 @@ export default function Home() {
     extractTraitsMutation.mutate({ method, faceReferenceKey });
   }
   function generatePrompt() {
-    if (mode === "text") return generateMutation.mutate({ method, mode, userText: direction, personalTraits });
+    if (mode === "text") return generateMutation.mutate({ method, mode, userText: direction, personalTraits, aspectRatio });
     if (!sceneImageKey) return setSceneError("Aguarde o envio da imagem de cena antes de gerar pelo modo Foto.");
     setSceneProgressStage("analyzing");
-    generateMutation.mutate({ method, mode, sceneImageKey, personalTraits });
+    generateMutation.mutate({ method, mode, sceneImageKey, personalTraits, aspectRatio });
   }
   async function copyPrompt(prompt = generatedPrompt) {
     if (!prompt) return;
@@ -278,6 +280,7 @@ export default function Home() {
             <div className="panel rounded-[1.65rem] p-5 sm:p-6">
               <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-start"><div><p className="font-soft text-[10px] font-bold tracking-[0.2em] text-white/46">DIREÇÃO DE ENTRADA</p><h3 className="mt-1 font-display text-3xl tracking-[-0.04em]">{METHOD_COPY[method].label}</h3></div><div className="mode-switch"><button onClick={() => setMode("text")} className={cn(mode === "text" && "active")}><Type className="h-3.5 w-3.5" /> Texto</button><button onClick={() => setMode("photo")} className={cn(mode === "photo" && "active")}><ImageIcon className="h-3.5 w-3.5" /> Foto</button></div></div>
               <p className="mt-5 font-soft text-sm leading-6 text-white/57">{modeDescription}</p>
+              <div className="mt-6"><p id="aspect-ratio-label" className="field-label">FORMATO DA IMAGEM <span>APLICADO EM CAMERA &amp; COMPOSITION</span></p><div role="radiogroup" aria-labelledby="aspect-ratio-label" className="mt-3 grid grid-cols-2 gap-2"><>{ASPECT_RATIO_OPTIONS.map(option => <button key={option.value} type="button" role="radio" aria-checked={aspectRatio === option.value} onClick={() => setAspectRatio(option.value)} className={cn("rounded-xl border px-3 py-3 text-left transition", aspectRatio === option.value ? "border-white bg-white text-black" : "border-white/15 bg-white/[0.025] text-white/70 hover:border-white/45 hover:text-white")}><span className="block font-display text-xl leading-none tracking-[-0.04em]">{option.value}</span><small className="mt-1 block font-soft text-[10px] font-bold tracking-[0.11em] opacity-65">{option.label}</small></button>)}</></div></div>
               {mode === "text" ? (
                 <div className="mt-6"><label htmlFor="creative-direction" className="field-label">DIREÇÃO CRIATIVA</label><textarea id="creative-direction" value={direction} onChange={event => setDirection(event.target.value)} placeholder={METHOD_COPY[method].input} className="mono-input min-h-[164px]" /><p className="mt-2 text-right font-soft text-[10px] text-white/35">{direction.length} / 2400</p></div>
               ) : (

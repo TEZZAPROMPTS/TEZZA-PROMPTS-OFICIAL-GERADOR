@@ -1,5 +1,7 @@
 import { invokeLLM } from "./_core/llm";
 
+import { applyAspectRatioToCameraComposition, DEFAULT_ASPECT_RATIO, type AspectRatio } from "../shared/aspectRatio";
+
 export const SECTION_DEFINITIONS = [
   { key: "cameraComposition", heading: "CAMERA & COMPOSITION" },
   { key: "poseBodyPositioning", heading: "POSE & BODY POSITIONING" },
@@ -150,10 +152,11 @@ function applyNaturalTraitBlocks(method: PromptMethod, sections: PromptSections,
   };
 }
 
-export function renderMethodPrompt(method: PromptMethod, sections: PromptSections, personalTraits?: string) {
+export function renderMethodPrompt(method: PromptMethod, sections: PromptSections, personalTraits?: string, aspectRatio: AspectRatio = DEFAULT_ASPECT_RATIO) {
   const spec = METHOD_SPECS[method];
   const preparedSections = {
     ...sections,
+    cameraComposition: applyAspectRatioToCameraComposition(sections.cameraComposition, aspectRatio),
     styleRenderQuality: spec.closing,
   };
   const naturalSections = applyNaturalTraitBlocks(method, preparedSections, personalTraits);
@@ -171,9 +174,11 @@ export function buildGenerationMessages(input: {
   userText?: string;
   personalTraits?: string;
   sceneImageUrl?: string;
+  aspectRatio?: AspectRatio;
 }) {
   const method = input.method ?? "feminine";
   const spec = METHOD_SPECS[method];
+  const selectedCameraFormat = applyAspectRatioToCameraComposition("", input.aspectRatio ?? DEFAULT_ASPECT_RATIO);
   const traits = input.personalTraits?.trim();
   const priorityTraits = traits
     ? `NON-NEGOTIABLE PERSONAL TRAITS AND RESTRICTIONS: ${traits}\nThese are the highest-priority rules. Translate them into natural English prompt prose and apply them faithfully in the relevant sections. Place facial structure and eye details only in FACE & IDENTITY; place visible skin tone and skin texture only in SKIN & REALISM; place hair colour, type, texture, fall, and movement only in HAIR; and place body details only in BODY & PHYSIQUE. Never use technical labels, preservation statements, duplicated phrasing, or the original Portuguese wording in the final prompt.`
@@ -182,6 +187,8 @@ export function buildGenerationMessages(input: {
   const system = `You are the content engine for TEZZA PROMPTS. Produce only a strict JSON object matching the supplied schema. Write every value in polished English prose. The final renderer—not you—will add the method's immutable opening, immutable STYLE & RENDER QUALITY text, and the 14 immutable section headings.
 
 METHOD IDENTITY: ${spec.baseDirection}
+
+CAMERA FORMAT: CAMERA & COMPOSITION must use exactly ${selectedCameraFormat} Do not state any other image format or aspect ratio.
 
 OUTPUT CONTRACT: Populate exactly these sections, in their intended scope: CAMERA & COMPOSITION (aspect ratio, shot, framing, angle, focus); POSE & BODY POSITIONING (stance, torso, arms, hands, physical positioning); HEAD POSITION & GAZE (head angle, chin, eye direction); FACIAL EXPRESSION (emotion and mouth/eye expression); FACE & IDENTITY (adult ${spec.avatarDescription}, facial structure, skin tone and identity); HAIR (colour, type, texture, fall and movement); ACCESSORIES & DETAILS (only visibly supported accessories and grooming); OUTFIT (garments, fabrics and styling); BODY & PHYSIQUE (proportions and anatomy); SKIN & REALISM (pores, highlights and CGI material detail); LIGHTING (flash, ambient sources, reflections and shadows); ENVIRONMENT (location and background); MOOD & AESTHETIC (editorial atmosphere); STYLE & RENDER QUALITY (immutable fixed base text; renderer applies it).
 
@@ -216,6 +223,7 @@ export async function generateMethodPrompt(input: {
   userText?: string;
   personalTraits?: string;
   sceneImageUrl?: string;
+  aspectRatio?: AspectRatio;
 }) {
   const method = input.method ?? "feminine";
   const request = {
@@ -244,7 +252,7 @@ export async function generateMethodPrompt(input: {
     if (typeof content === "string") {
       try {
         const parsed = parseStructuredJson(content) as Partial<PromptSections>;
-        return renderMethodPrompt(method, normalizeSections(parsed), input.personalTraits);
+        return renderMethodPrompt(method, normalizeSections(parsed), input.personalTraits, input.aspectRatio ?? DEFAULT_ASPECT_RATIO);
       } catch {
         // A retry below handles rare truncated or fenced model responses.
       }
